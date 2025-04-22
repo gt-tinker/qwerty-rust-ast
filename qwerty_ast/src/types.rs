@@ -5,7 +5,7 @@ use crate::dimexpr::*;
 use std::any::Any;
 use std::collections::HashMap;
 
-use crate::basis::{Basis, BasisLiteral, BuiltInBasis, QubitLiteral, QubitSymbol};
+use crate::basis::{QubitLiteral, QubitSymbol};
 
 // Copying this from ast.hpp => QubitLiteral's definition
 // This selects the eigenvector based on a given PrimitiveBasis
