@@ -25,51 +25,55 @@ The way the dimension variable expression solver works is as follows:
     3. (Within the `solve` function) Simplify two candidate constraints and move all constant values to one side, then create a matrix representing a system of equations for our constraints and solve it, yielding values for our dimension variables.
 
 ## Building the Qwerty AST
-The Qwerty AST utilizes Maturin. Maturin is a tool that helps build and publish Python packages with native Rust extensions. It's specifically designed to bridge the gap between Rust and Python to write performance-critical parts of a Python project in Rust.
 
-    1. Create a virtual environment to help package libraries in Python
-        ```
-        python3 -m venv venv
-        ```
-       Then, activate the venv using the following command
-        ```
-        . venv/bin/activate
-        ```
-    2. Install the Maturin library
-        ```
-        pip install maturin
-        ```
-    3. Under the qwerty_ast folder, there will be a file named `Cargo.toml` and in line 7, features will need to include "abi3-py310"
+The Qwerty AST utilizes [Maturin](https://github.com/PyO3/maturin), a tool that helps build and publish Python packages with native Rust extensions. It's specifically designed to bridge the gap between Rust and Python to write performance-critical parts of a Python project in Rust.
 
-       Change this line:
-        ```
-        pyo3 = {version = "0.22.2", features = ["py-clone"]}
-        ```
-       To include:
-        ```
-        pyo3 = {version = "0.20", features = ["extension-module", "abi3-py310"]}
-        ```
+### 1. Create a virtual environment
+Create and activate a virtual environment:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
 
-    4. If you are using the wip/repl branch remove PyFrame in line 15 of the file `ast.rs` 
-        ```
-        use pyo3::types::{PyFrame, PyString, PyList};
-        ```
-       It should look like this:
-        ```
-        use pyo3::types::{PyString, PyList}
-        ```
-    5. Finally, use this command to builds the crate and installs it as a python module directly in the current virtualenv
-        ```
-        maturin develop
-        ```
-    6. To run the Qwerty AST, cd to repl folder and run the following commands:
-        ```
-        python3
-        ```
-        ```
-        import qwerty_ast
-        ```
-        ```
-        python main.py
-        ```
+### 2. Install the Maturin library
+```bash
+pip install maturin
+```
+
+### 3. Update `Cargo.toml`
+Navigate to the `qwerty_ast` folder. In `Cargo.toml`, change the line:
+```toml
+pyo3 = { version = "0.22.2", features = ["py-clone"] }
+```
+To:
+```toml
+pyo3 = { version = "0.20", features = ["extension-module", "abi3-py310"] }
+```
+
+### 4. Modify `ast.rs` (if using the `wip/repl` branch)
+Remove `PyFrame` from line 15:
+**Before:**
+```rust
+use pyo3::types::{PyFrame, PyString, PyList};
+```
+**After:**
+```rust
+use pyo3::types::{PyString, PyList};
+```
+
+### 5. Build the Python module
+Run this from the root of the Rust crate:
+```bash
+maturin develop
+```
+
+### 6. Run the Qwerty AST
+Change to the `repl` folder and run:
+```bash
+python3
+>>> import qwerty_ast
+>>> exec(open("main.py").read())
+```
+
+
         
