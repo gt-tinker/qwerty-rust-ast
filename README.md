@@ -72,7 +72,14 @@ Change to the `repl` folder and run:
 ```bash
 python3
 >>> import qwerty_ast
->>> exec(open("main.py").read())
+```
+Exit python3 using ctrl + d on mac, ctrl + z + enter on windows and run the Qwerty AST by running main.py:
+```bash
+python main.py
+```
+Input commands to convert to tensors
+```bash
+'1'
 ```
 
 
