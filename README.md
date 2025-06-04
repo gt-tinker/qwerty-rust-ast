@@ -73,7 +73,7 @@ Change to the `repl` folder and run:
 python3
 >>> import qwerty_ast
 ```
-Exit python3 using ctrl + d on mac, ctrl + z + enter on windows and run the Qwerty AST by running main.py:
+Exit python3 using `CTRL + D` on mac, `CTRL + Z + ENTER` on windows and run the Qwerty AST by running `main.py`:
 ```bash
 python main.py
 ```
