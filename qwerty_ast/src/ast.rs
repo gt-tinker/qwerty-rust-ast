@@ -12,7 +12,7 @@ use crate::types::*;
 use num::complex::Complex;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyFrame, PyString, PyList};
+use pyo3::types::{PyString, PyList};
 use std::collections::{HashMap, HashSet};
 pub use crate::basis::{QubitLiteral, QubitSymbol};
 use crate::dimexpr::DimExpr::Number;
