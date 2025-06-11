@@ -7,44 +7,6 @@ import ast
 import qwerty_ast
 #################### COMMON CODE FOR BOTH @QPU AND @CLASSICAL DSLs ####################
 
-# Hard-coded 1101
-
-# def convert_to_qwerty(py_ast):
-#     print(ast.dump(py_ast, indent=4))
-#     value = unpack_ast(py_ast)
-#     if value is None or not isinstance(py_ast.body[0], ast.Expr):
-#         return "Invalid Expression: Not a qubit literal or Tensor"
-#     if value == "1101":
-#         tensor = qwerty_ast.NodeBox.new_qubit_tensor(value)
-#     else:
-#         return "Not 1101"
-#     return tensor.get_tensor()
-
-
-# General check for 0s and 1s in value
-# def convert_to_qwerty(py_ast):
-#     print(ast.dump(py_ast, indent=4))
-#     value = unpack_ast(py_ast)
-
-#     if value is None or not isinstance(py_ast.body[0], ast.Expr):
-#         return "Invalid Expression: Not a qubit literal or Tensor"
-    
-#     if (isinstance(value, str) and all(num in "01" for num in value)):
-#         tensor = qwerty_ast.NodeBox.new_qubit_tensor(value)
-#         return tensor.get_tensor()
-    
-#     return "Error: Not 1s or 0s / unsupported expression"
-
-
-# Updated check to handle binOpAdd, and allow the REPL to handle recursion
-#   """
-#   1) Check if py_ast is a valid AST and if the AST has contents
-#   2) Check if the value is an expression
-#   3) Recursively loop through AST
-#   """
-
-# global var for the case if x = '1' and is the only variable inputted
-
 
 def convert_to_qwerty(py_ast):
     print(ast.dump(py_ast, indent=4))
@@ -52,7 +14,6 @@ def convert_to_qwerty(py_ast):
         return "Invalid AST"
     
     value = py_ast.body[0]
-    print(value)
     if not isinstance(value, ast.Expr):
         return "Invalid syntax; expected an expression"
     
@@ -61,44 +22,47 @@ def convert_to_qwerty(py_ast):
     except Exception as e:
         return f"Error: {e}"
     
-#   """
 #   1) check if the instance is a binOp, if so, check its left or right values and then perform the binOp. only sum is implemented for now
 #   2) check if the instance is a constant and return it as a tensor, return value in a tensor
-#   3) check if the input is a variable, if so get the actual value of the variable and then return the value in a tensor
-#   """
+
     
 def convert_expr(node):
     if isinstance(node, ast.Constant):
         val = node.value
         if isinstance(val, str) and all(num in "01" for num in val):
             tensor = qwerty_ast.NodeBox.new_qubit_tensor(node.value)
-            print("tensor type:", type(tensor))
-            print("tensor contents:", dir(tensor))            
+            # print("tensor type:", type(tensor))
+            # print("tensor contents:", dir(tensor))            
             return tensor
         else:
             raise ValueError("Invalid character, e.g. not 1s and 0s")
         
-    # elif isinstance(node, ast.BinOp):
-    #     left = convert_expr(node.left)
-    #     right = convert_expr(node.right)
-    #     if isinstance(node.op, ast.Add):
-    #         return qwerty_ast.NodeBox.(left, right)
-    #     else:
-    #         raise NotImplementedError("Operation is not supported, only addition for now")
+    elif isinstance(node, ast.BinOp):
+        left = convert_expr(node.left)
+        right = convert_expr(node.right)
+        if isinstance(node.op, ast.Add):
+            return concat_tensors(left, right)
+        else:
+            raise NotImplementedError("Operation is not supported, only addition for now")
         
     # elif isinstance(node, ast.Name):
     #     symbol_table[node.id] = qwerty_ast.NodeBox.resolve_name(node.id)
     #     return qwerty_ast.NodeBox.resolve_name(node.id)
     # else:
     #     raise NotImplementedError("Variable not supported")
-    
+
+def concat_tensors(left, right):
+    left_val = left.get_tensor()
+    right_val = right.get_tensor()
+    combined = str(left_val) + str(right_val)
+    # print(combined)
+    return qwerty_ast.NodeBox.new_qubit_tensor(combined)
 
 # def unpack_ast(ast):
 #     try:
 #         return ast.body[0].value.value
 #     except AttributeError:
 #         return None
-    
 
 
 
