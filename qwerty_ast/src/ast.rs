@@ -1,5 +1,12 @@
-//  AST definition v1
-// Abstract Syntax Tree (AST) definitions for the QWERTY
+/*
+ * QWERTY Programming Language Compiler
+ * Abstract Syntax Tree (AST) Definitions
+ * 
+ * This module defines the Abstract Syntax Tree (AST) structures
+ * used for parsing and representing QWERTY programs.
+ * 
+ * Version: 1.0
+ */
 
 use crate::span::SourceSpan;
 
@@ -16,7 +23,7 @@ pub enum Type {
     },
     RegType {
         elem_ty: RegKind,
-        dim: u32,
+        dim: u64,
     },
     UnitType,
 }

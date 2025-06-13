@@ -1,4 +1,18 @@
-use crate::ast::SourceSpan;
+use crate::span::SourceSpan;
+
+/// UndefinedVariable: Variable is used but not declared or is out of scope.
+/// RedefinedVariable: Variable declared more than once in the same scope.
+/// UninitializedVariable: Variable is used before being assigned a value.
+/// ImmutableAssignment: Attempt to assign to a variable that is immutable.
+/// MismatchedTypes: Value type does not match the expected type.
+/// WrongArity: Number of arguments in a call does not match what is expected.
+/// NotCallable: Attempt to call something that is not a function or gate.
+/// InvalidType: Type is not supported or is malformed.
+/// InvalidOperation: Operation is not valid for the given type.
+/// TypeInferenceFailure: Compiler could not determine the type.
+/// QuantumMeasurementOnClassical: Attempt to measure a classical (non-qubit) variable.
+/// InvalidQubitOperation: Invalid operation performed on a qubit.
+/// UnsupportedPythonConstruct: Python AST node not supported by the DSL.
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeErrorKind {
@@ -27,19 +41,3 @@ pub struct TypeError {
     pub kind: TypeErrorKind,
     pub span: Option<SourceSpan>,
 }
-
-
-/// UndefinedVariable: Variable is used but not declared or is out of scope.
-/// RedefinedVariable: Variable declared more than once in the same scope.
-/// UninitializedVariable: Variable is used before being assigned a value.
-/// ImmutableAssignment: Attempt to assign to a variable that is immutable.
-/// MismatchedTypes: Value type does not match the expected type.
-/// WrongArity: Number of arguments in a call does not match what is expected.
-/// NotCallable: Attempt to call something that is not a function or gate.
-/// InvalidType: Type is not supported or is malformed.
-/// InvalidOperation: Operation is not valid for the given type.
-/// TypeInferenceFailure: Compiler could not determine the type.
-/// QuantumMeasurementOnClassical: Attempt to measure a classical (non-qubit) variable.
-/// InvalidQubitOperation: Invalid operation performed on a qubit.
-/// UnsupportedPythonConstruct: Python AST node not supported by the DSL.
-/// SyntaxError: Code contains a syntax error or malformed statement.
