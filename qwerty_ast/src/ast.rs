@@ -19,8 +19,8 @@ use crate::dimexpr::DimExpr::Number;
 
 #[derive(Debug, Clone)]
 pub enum ASTNode {
-    ZeroQubit(ZeroQubit),
-    OneQubit(OneQubit),
+    ZeroQubit(),
+    OneQubit(),
     Tensor(Tensor),
 }
 
