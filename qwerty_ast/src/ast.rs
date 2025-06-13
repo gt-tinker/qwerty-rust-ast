@@ -12,15 +12,15 @@ use crate::types::*;
 use num::complex::Complex;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyFrame, PyString, PyList};
+use pyo3::types::{PyString, PyList};
 use std::collections::{HashMap, HashSet};
-pub use crate::basis::{QubitLiteral, QubitSymbol};
+pub use crate::basis::{OneQubit, ZeroQubit};
 use crate::dimexpr::DimExpr::Number;
 
 #[derive(Debug, Clone)]
 pub enum ASTNode {
-    QubitSymbol(QubitSymbol),
-    QubitLiteral(QubitLiteral),
+    ZeroQubit(),
+    OneQubit(),
     Tensor(Tensor),
 }
 
@@ -33,7 +33,7 @@ pub struct NodeBox {
 #[pymethods]
 impl NodeBox {
     #[staticmethod]
-    fn new_qubit_symbol(str: &PyString) -> PyResult<NodeBox> {
+    fn new_zero_qubit(str: &PyString) -> PyResult<NodeBox> {
         let s = str.to_string();
         if s.len() != 1 {
             // TODO: Check if ASCII encoding and not some silly emoji :)
@@ -41,8 +41,8 @@ impl NodeBox {
         }
         let c = s.as_bytes()[0];
         Ok(NodeBox {
-            ptr: Box::new(ASTNode::QubitSymbol {
-                0: QubitSymbol { sym: c, typ: None },
+            ptr: Box::new(ASTNode::ZeroQubit {
+                0: ZeroQubit { sym: c, typ: None },
             }),
         })
     }
@@ -64,43 +64,9 @@ impl NodeBox {
         })
     }
 
-    #[staticmethod]
-    fn new_qubit_tensor(s: &PyString) -> PyResult<NodeBox> {
-        let s = s.to_string();
-
-        if s.is_empty() {
-            return Err(PyValueError::new_err("empty qubit literal"));
-        }
-
-        let mut nodes = Vec::with_capacity(s.len());
-
-        for (i, c) in s.bytes().enumerate() {
-            if !c.is_ascii() {
-                return Err(PyValueError::new_err(format!(
-                    "non-ASCII character at position {}: {:?}",
-                    i, s.chars().nth(i)
-                )));
-            }
-
-            nodes.push(ASTNode::QubitSymbol {
-                0: QubitSymbol { sym: c, typ: None },
-            });
-        }
-
-        Ok(NodeBox {
-            ptr: Box::new(ASTNode::Tensor {
-                0: Tensor {
-                    elts: nodes,
-                    factor: DimExpr::from(1),
-                    typ: None,
-                },
-            }),
-        })
-    }
-
     fn get_tensor(&self) -> PyResult<Option<String>> {
         match *self.ptr {
-            ASTNode::QubitSymbol(ref qs) => {
+            ASTNode::ZeroQubit(ref qs) => {
                 Ok(Some((qs.sym as char).to_string()))
             }
             ASTNode::Tensor(ref tensor) => {
@@ -108,11 +74,11 @@ impl NodeBox {
 
                 for node in &tensor.elts {
                     match node {
-                        ASTNode::QubitSymbol { 0: QubitSymbol { sym, .. } } => {
+                        ASTNode::ZeroQubit { 0: ZeroQubit { sym, .. } } => {
                             result.push(*sym as char);
                         }
                         _ => {
-                            return Err(PyValueError::new_err("Tensor contains non-QubitSymbol element"));
+                            return Err(PyValueError::new_err("Tensor contains non-ZeroQubit element"));
                         }
                     }
                 }
@@ -127,9 +93,9 @@ impl ASTNode {
     // Cringe helper function
     pub fn get_typ(&self) -> Option<Type> {
         match self {
-            ASTNode::QubitSymbol(val) => val.typ.clone(),
+            ASTNode::ZeroQubit(val) => val.typ.clone(),
             ASTNode::Tensor(val) => val.typ.clone(),
-            ASTNode::QubitLiteral(val) => val.typ.clone(),
+            ASTNode::OneQubit(val) => val.typ.clone(),
         }
     }
 
@@ -137,9 +103,9 @@ impl ASTNode {
     #[allow(unused)]
     pub fn get_dim(&self) -> Option<DimExpr> {
         match self {
-            ASTNode::QubitSymbol(_) => None,
+            ASTNode::ZeroQubit(_) => None,
             ASTNode::Tensor(_) => None,
-            ASTNode::QubitLiteral(val) => Some(val.factor.clone()),
+            ASTNode::OneQubit(val) => Some(val.factor.clone()),
         }
     }
 }

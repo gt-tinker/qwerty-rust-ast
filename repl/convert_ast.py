@@ -7,19 +7,64 @@ import ast
 import qwerty_ast
 #################### COMMON CODE FOR BOTH @QPU AND @CLASSICAL DSLs ####################
 
+
 def convert_to_qwerty(py_ast):
     print(ast.dump(py_ast, indent=4))
-    value = unpack_ast(py_ast)
-    if value is None:
-        return "Invalid Expression: Not a qubit literal or Tensor"
-    tensor = qwerty_ast.NodeBox.new_qubit_tensor(py_ast.body[0].value.value)
-    return tensor.get_tensor()
-
-def unpack_ast(ast):
+    if not isinstance(py_ast, (ast.Interactive, ast.Module, ast.Expression)):
+        return "Invalid AST"
+    
+    value = py_ast.body[0]
+    if not isinstance(value, ast.Expr):
+        return "Invalid syntax; expected an expression"
+    
     try:
-        return ast.body[0].value.value
-    except AttributeError:
-        return None
+        return convert_expr(value.value)
+    except Exception as e:
+        return f"Error: {e}"
+    
+#   1) check if the instance is a binOp, if so, check its left or right values and then perform the binOp. only sum is implemented for now
+#   2) check if the instance is a constant and return it as a tensor, return value in a tensor
+
+    
+def convert_expr(node):
+    if isinstance(node, ast.Constant):
+        val = node.value
+        if isinstance(val, str) and all(num in "01" for num in val):
+            tensor = qwerty_ast.NodeBox.new_qubit_tensor(node.value)
+            # print("tensor type:", type(tensor))
+            # print("tensor contents:", dir(tensor))            
+            return tensor
+        else:
+            raise ValueError("Invalid character, e.g. not 1s and 0s")
+        
+    elif isinstance(node, ast.BinOp):
+        left = convert_expr(node.left)
+        right = convert_expr(node.right)
+        if isinstance(node.op, ast.Add):
+            return concat_tensors(left, right)
+        else:
+            raise NotImplementedError("Operation is not supported, only addition for now")
+        
+    # elif isinstance(node, ast.Name):
+    #     symbol_table[node.id] = qwerty_ast.NodeBox.resolve_name(node.id)
+    #     return qwerty_ast.NodeBox.resolve_name(node.id)
+    # else:
+    #     raise NotImplementedError("Variable not supported")
+
+def concat_tensors(left, right):
+    left_val = left.get_tensor()
+    right_val = right.get_tensor()
+    combined = str(left_val) + str(right_val)
+    # print(combined)
+    return qwerty_ast.NodeBox.new_qubit_tensor(combined)
+
+# def unpack_ast(ast):
+#     try:
+#         return ast.body[0].value.value
+#     except AttributeError:
+#         return None
+
+
 
 # def convert_ast(module: ast.Module, filename: str = '', line_offset: int = 0,
 #                 col_offset: int = 0) -> Tuple[Kernel, List[bool]]:
@@ -39,6 +84,10 @@ def unpack_ast(ast):
 #     """
 #     return convert_qpu_ast(module, filename, line_offset, col_offset)
 #
+
+
+    
+
 # class BaseVisitor:
 #     """
 #     Common Python AST visitor for both ``@classical`` and ``@qpu`` kernels.
@@ -113,7 +162,7 @@ def unpack_ast(ast):
 #     EMBED_INPLACE,
 # )
 #
-# EMBEDDING_KEYWORDS = {embedding_kind_name(e): e
+# EMBEDDING_KEYWORDS = {embedFailed to authenticate. ding_kind_name(e): e
 #                       for e in EMBEDDING_KINDS}
 #
 # RESERVED_KEYWORDS = {'id', 'discard', 'discardz', 'measure', 'flip'}

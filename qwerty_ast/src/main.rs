@@ -23,29 +23,6 @@ mod inference;
 mod types;
 
 
-
-macro_rules! ast_node {
-        ($id:ident, $( $field:ident : $val:expr ),*) => {
-            Box::new(ASTNode::$id(ast::$id {
-           pub(crate)     $( $field : $val, )*
-            }))
-        };
-    }
-
-macro_rules! ast_node_struct {
-        ($id:ident, $( $field:ident : $val:expr ),*) => {
-            ast::$id {
-                $( $field : $val, )*
-            };
-        };
-    }
-
-macro_rules! ast_dim {
-        ($dim_str:expr) => {
-            dimexpr::DimExpr::from_str($dim_str).unwrap()
-        };
-    }
-
 #[pymodule]
 fn qwerty_ast(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<NodeBox>()?;
