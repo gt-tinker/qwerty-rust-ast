@@ -104,12 +104,58 @@ pub fn typecheck_stmt(
             Ok(())
         }
 
-        Stmt::UnpackAssign { lhs: _, rhs, span: _ } => {
-            // TODO: Implement tuple/list unpacking logic.
-            let _rhs_ty = typecheck_expr(rhs, env)?;
-            // Qwerty spec needed: Should rhs_ty be tuple? How to handle arity?
-            Ok(())
+        // TODO: Done, VERIFY!
+        /*
+        RHS can be of type UnitType, FuncType or RegType, but we want to only allow Unpacking for RegType,
+        if it's not, thow a type Error!
+
+            match rhs_ty {
+                Type::RegType { element_type, dim } => { ... } // valid!
+                _ => Err(TypeError { ... }) // all other types are errors
+            }
+        
+        After verifying that rhs is a register of the correct dimension (e.g., qubit[3] 
+        and lhs is ["a", "b", "c"]), you must assign a type to each new variable on the left.
+        Each variable (a, b, c) gets its own type binding in the environment:
+        */
+        Stmt::UnpackAssign { lhs, rhs, span } => {
+            // 1. Typecheck the right-hand side expression (should return its type)
+            let rhs_ty = typecheck_expr(rhs, env)?;
+            // 2. Only allow unpacking if rhs_ty is a register type (Type::RegType)
+            match rhs_ty {
+                Type::RegType { elem_ty, dim } => {
+                    // 3. Check that number of variables matches register dimension
+                    if lhs.len() as u64 != dim {
+                        return Err(TypeError {
+                            kind: TypeErrorKind::WrongArity { 
+                                expected: dim as usize, 
+                                found: lhs.len() 
+                            },
+                            span: span.clone(),
+                        });
+                    }
+                    // 4. Bind each variable to a single-element register of same kind, of type RegType{ elem_ty, dim: 1 }
+                    for var in lhs {
+                        env.insert_var(
+                            var,
+                            Type::RegType {
+                                elem_ty: elem_ty.clone(),
+                                dim: 1,
+                            },
+                        );
+                    }
+                    Ok(())
+                }
+                // 5. If rhs_ty is NOT a register, raise error
+                _ => Err(TypeError {
+                    kind: TypeErrorKind::InvalidType(format!(
+                        "Can only unpack from register type, found: {:?}", rhs_ty
+                    )),
+                    span: span.clone(),
+                }),
+            }
         }
+
 
         Stmt::Return { val, span } => {
             let val_ty = typecheck_expr(val, env)?;
@@ -145,17 +191,28 @@ pub fn typecheck_expr(expr: &Expr, env: &mut TypeEnv) -> Result<Type, TypeError>
 
         Expr::UnitLiteral { span: _ } => Ok(Type::UnitType),
 
-        Expr::Adjoint { func, span: _ } => {
-            // Adjoint should be a function type (unitary/quantum), not classical.
+        Expr::Adjoint { func, span } => {
             let func_ty = typecheck_expr(func, env)?;
-            // TODO: Enforce Qwerty adjoint typing rules.
-            Ok(func_ty)
+
+            match func_ty {
+                Type::RevFuncType { in_out_ty } => {
+                    Ok(Type::RevFuncType { in_out_ty })
+                }
+                _ => Err(TypeError {
+                    kind: TypeErrorKind::InvalidQubitOperation(
+                        "Adjoint can only be applied to reversible (RevFuncType) quantum functions".to_string(),
+                    ),
+                    span: span.clone(),
+                }),
+            }
         }
+
 
         Expr::Pipe { lhs, rhs, span: _ } => {
             // Typing rule: lhs type must match rhs function input type.
             let lhs_ty = typecheck_expr(lhs, env)?;
             let rhs_ty = typecheck_expr(rhs, env)?;
+
             match &rhs_ty {
                 Type::FuncType { in_ty, out_ty } => {
                     if **in_ty != lhs_ty {
@@ -169,6 +226,7 @@ pub fn typecheck_expr(expr: &Expr, env: &mut TypeEnv) -> Result<Type, TypeError>
                     }
                     Ok((**out_ty).clone())
                 }
+                
                 _ => Err(TypeError {
                     kind: TypeErrorKind::NotCallable(format!("{:?}", rhs_ty)),
                     span: None,
@@ -450,6 +508,82 @@ mod tests {
         };
         let result = typecheck_program(&prog);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_unpack_assign_typing() {
+        use crate::ast::*;
+
+        // Case 1: Legal unpack (2 variables, qubit[2])
+        let legal_prog = Program {
+            funcs: vec![FunctionDef {
+                name: "main".into(),
+                args: vec![],
+                ret_type: Type::UnitType,
+                body: vec![
+                    Stmt::UnpackAssign {
+                        lhs: vec!["a".into(), "b".into()],
+                        rhs: Expr::Variable {
+                            name: "payload".into(),
+                            span: None,
+                        },
+                        span: None,
+                    }
+                ],
+                span: None,
+            }],
+            span: None,
+        };
+
+        // The environment must bind payload to a qubit[2] for this to pass
+        let mut env = TypeEnv::new();
+        env.insert_var("payload", Type::RegType { elem_ty: RegKind::Qubit, dim: 2 });
+
+        // The typechecker expects to build the environment itself, so let's test the stmt directly:
+        let stmt = &legal_prog.funcs[0].body[0];
+        let result = super::typecheck_stmt(stmt, &mut env, &Type::UnitType);
+        assert!(result.is_ok(), "Legal unpack failed typechecking");
+
+        // Case 2: Illegal unpack (3 variables, qubit[2])
+        let illegal_stmt = Stmt::UnpackAssign {
+            lhs: vec!["a".into(), "b".into(), "c".into()],
+            rhs: Expr::Variable {
+                name: "payload".into(),
+                span: None,
+            },
+            span: None,
+        };
+        let mut env2 = TypeEnv::new();
+        env2.insert_var("payload", Type::RegType { elem_ty: RegKind::Qubit, dim: 2 });
+
+        let result2 = super::typecheck_stmt(&illegal_stmt, &mut env2, &Type::UnitType);
+        assert!(
+            matches!(result2, Err(TypeError { kind: TypeErrorKind::WrongArity { .. }, .. })),
+            "Unpack of mismatched arity did not fail as expected"
+        );
+    }
+
+    #[test]
+    fn test_unpack_assign_non_register_rhs() {
+        use crate::ast::*;
+
+        // Trying to unpack a UnitType (not a register!)
+        let stmt = Stmt::UnpackAssign {
+            lhs: vec!["a".into()],
+            rhs: Expr::Variable {
+                name: "not_a_reg".into(),
+                span: None,
+            },
+            span: None,
+        };
+        let mut env = TypeEnv::new();
+        env.insert_var("not_a_reg", Type::UnitType);
+
+        let result = super::typecheck_stmt(&stmt, &mut env, &Type::UnitType);
+        assert!(
+            matches!(result, Err(TypeError { kind: TypeErrorKind::InvalidType(_), .. })),
+            "Unpack of non-register type did not fail as expected"
+        );
     }
 
     // TODO: Add more tests for all language constructs! In separate test file? Later
