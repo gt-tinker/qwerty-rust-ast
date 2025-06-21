@@ -67,6 +67,15 @@ pub fn typecheck_program(prog: &Program) -> Result<(), TypeError> {
 
 /// Typechecks a single function and its body.
 pub fn typecheck_function(func: &FunctionDef) -> Result<(), TypeError> {
+
+    assert_eq!(
+        func.is_rev,
+        matches!(func.ret_type, Type::RevFuncType { .. }),
+        "is_rev and ret_type are out of sync for function: {}",
+        func.name
+    );
+
+    // ---------------------------
     let mut env = TypeEnv::new();
 
     // Bind function arguments in the environment.
@@ -487,11 +496,11 @@ mod tests {
     fn test_typecheck_var_and_assign() {
         let prog = Program {
             funcs: vec![
-                FunctionDef {
-                    name: "main".into(),
-                    args: vec![(Type::UnitType, "x".into())],
-                    ret_type: Type::UnitType,
-                    body: vec![
+                FunctionDef::new(
+                    "main".into(),
+                    vec![(Type::UnitType, "x".into())],
+                    Type::UnitType,
+                    vec![
                         Stmt::Assign {
                             lhs: "y".into(),
                             rhs: Expr::Variable {
@@ -501,11 +510,12 @@ mod tests {
                             span: None,
                         }
                     ],
-                    span: None,
-                }
+                    None,
+                )
             ],
             span: None,
         };
+
         let result = typecheck_program(&prog);
         assert!(result.is_ok());
     }
@@ -516,11 +526,11 @@ mod tests {
 
         // Case 1: Legal unpack (2 variables, qubit[2])
         let legal_prog = Program {
-            funcs: vec![FunctionDef {
-                name: "main".into(),
-                args: vec![],
-                ret_type: Type::UnitType,
-                body: vec![
+            funcs: vec![FunctionDef::new (
+                "main".into(),
+                vec![],
+                Type::UnitType,
+                vec![
                     Stmt::UnpackAssign {
                         lhs: vec!["a".into(), "b".into()],
                         rhs: Expr::Variable {
@@ -530,8 +540,8 @@ mod tests {
                         span: None,
                     }
                 ],
-                span: None,
-            }],
+                None,
+                )],
             span: None,
         };
 
