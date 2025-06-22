@@ -179,7 +179,7 @@ pub struct FunctionDef {
     pub args: Vec<(Type, String)>,
     pub ret_type: Type,
     pub body: Vec<Stmt>,
-    pub is_rev: bool,
+    pub is_rev: bool,   // annotated with `@reversible`
     pub span: Option<SourceSpan>,
 }
 
@@ -189,12 +189,13 @@ impl FunctionDef {
         args: Vec<(Type, String)>,
         ret_type: Type,
         body: Vec<Stmt>,
+        is_rev: bool, // passed from the parser
         span: Option<SourceSpan>,
     ) -> Self {
-        let is_rev = matches!(ret_type, Type::RevFuncType { .. });
         Self { name, args, ret_type, body, is_rev, span }
     }
 
+    /// Returns true if the function was explicitly annotated as reversible.
     pub fn is_reversible(&self) -> bool {
         self.is_rev
     }

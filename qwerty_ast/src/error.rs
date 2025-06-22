@@ -13,6 +13,8 @@ use crate::span::SourceSpan;
 /// QuantumMeasurementOnClassical: Attempt to measure a classical (non-qubit) variable.
 /// InvalidQubitOperation: Invalid operation performed on a qubit.
 /// UnsupportedPythonConstruct: Python AST node not supported by the DSL.
+/// NonReversibleOperationInReversibleFunction: Function is declared @reversible but contains operations that are inherently non-reversible.
+/// ReversibilityAnnotationMismatch: Function's declared @reversible annotation and its return type (RevFuncType) are inconsistent.
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeErrorKind {
@@ -32,6 +34,13 @@ pub enum TypeErrorKind {
     // Python-DSL/AST-specific errors:
     UnsupportedPythonConstruct(String),
     SyntaxError(String),
+
+    NonReversibleOperationInReversibleFunction(String),
+    ReversibilityAnnotationMismatch {
+        declared_reversible: bool, // From annotation (func.is_rev)
+        inferred_reversible: bool, // From signature (matches!(func.ret_type, Type::RevFuncType))
+        func_name: String,
+    },
     
     // ... TODO: Ask Austin for Quantum/QWERTY specific errors
 }
