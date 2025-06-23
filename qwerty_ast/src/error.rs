@@ -41,8 +41,6 @@ pub enum TypeErrorKind {
         inferred_reversible: bool, // From signature (matches!(func.ret_type, Type::RevFuncType))
         func_name: String,
     },
-    
-    // ... TODO: Ask Austin for Quantum/QWERTY specific errors
 }
 
 #[derive(Debug, Clone, PartialEq)]

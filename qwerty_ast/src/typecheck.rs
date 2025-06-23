@@ -21,30 +21,10 @@ impl TypeEnv {
     }
 
     // Allows Shadowing
-    // (If a variable with the same name as lhs already exists in the environment, this will overwrite (shadow) the previous binding with the new type)
     pub fn insert_var(&mut self, name: &str, typ: Type) {
         self.vars.insert(name.to_string(), typ);
     }
 
-    // QWERTY follows Python's variable rules: shadowing is allowed.
-    // To disallow shadowing, uncomment the code below and update call sites.
-    
-    // Disallow Shadowing (TODO: Seems not required, confirm with Austin)
-    /*
-    pub fn insert_var(&mut self, name: &str, typ: Type) -> Result<(), TypeError> {
-        if self.vars.contains_key(name) {
-            return Err(TypeError {
-                kind: TypeErrorKind::RedefinedVariable(name.to_string()),
-                span: None,
-            });
-        }
-        self.vars.insert(name.to_string(), typ);
-        Ok(())
-    }
-    // Update Usage:
-    // In typecheck_function and typecheck_stmt:
-    // >>    env.insert_var(name, ty.clone())?;
-    */
 
     pub fn get_var(&self, name: &str) -> Option<&Type> {
         self.vars.get(name)
@@ -69,61 +49,53 @@ pub fn typecheck_program(prog: &Program) -> Result<(), TypeError> {
 pub fn typecheck_function(func: &FunctionDef) -> Result<(), TypeError> {
     let mut env = TypeEnv::new();
 
-    // Bind function arguments in the environment.
+    // Bind function arguments in environment
     for (ty, name) in &func.args {
         env.insert_var(name, ty.clone());
     }
 
-    // 1. Get the declared reversibility from the function's annotation (now stored in func.is_rev).
     let is_annotated_reversible = func.is_rev;
-
-    // 2. Determine if the return type itself declares reversibility (i.e., is RevFuncType).
     let is_signature_reversible = matches!(func.ret_type, Type::RevFuncType {.. });
 
-    // 3. Consistency check: Annotation vs. Signature
-    // If @reversible is present, the return type MUST be RevFuncType.
+    // Check annotation matches signature
     if is_annotated_reversible &&!is_signature_reversible {
         return Err(TypeError {
             kind: TypeErrorKind::ReversibilityAnnotationMismatch {
-                declared_reversible: true, // From annotation
-                inferred_reversible: false, // From signature
+                declared_reversible: true,
+                inferred_reversible: false,
                 func_name: func.name.clone(),
             },
             span: func.span.clone(),
         });
     }
-    // If the return type is RevFuncType, the @reversible annotation SHOULD be present.
-    // This enforces good practice and clarity, as `RevFuncType` implies specific compiler behavior.
     else if!is_annotated_reversible && is_signature_reversible {
         return Err(TypeError {
             kind: TypeErrorKind::ReversibilityAnnotationMismatch {
-                declared_reversible: false, // From annotation
-                inferred_reversible: true,  // From signature
+                declared_reversible: false,
+                inferred_reversible: true,
                 func_name: func.name.clone(),
             },
             span: func.span.clone(),
         });
     }
 
-    // At this point, `is_annotated_reversible` and `is_signature_reversible` are consistent.
-    // We use this consistent status to decide if we need to check the body for inherent reversibility.
-    let effective_reversible_status = is_annotated_reversible; // They are the same now due to the checks above.
+    let effective_reversible_status = is_annotated_reversible;
 
-    // 4. If the function is effectively declared as reversible, infer its actual body reversibility.
+    // Validate reversibility (check if declared)
     if effective_reversible_status {
         let inferred_body_reversible = infer_function_body_reversibility(&func.body, &mut env.clone())?;
 
         if!inferred_body_reversible {
             return Err(TypeError {
                 kind: TypeErrorKind::NonReversibleOperationInReversibleFunction(
-                    format!("Function '{}' is declared @reversible (or has a RevFuncType signature) but contains non-reversible operations (e.g., measurement, discard, or classical conditional).", func.name)
+                    format!("Function '{}' is declared @reversible but contains non-reversible operations.", func.name)
                 ),
                 span: func.span.clone(),
             });
         }
     }
 
-    // 5. Continue with general type checking for statements (ensuring types match, linearity, etc.).
+    // Check statement types
     let expected_ret_type = &func.ret_type;
     for stmt in &func.body {
         typecheck_stmt(stmt, &mut env, expected_ret_type)?;
@@ -151,15 +123,9 @@ pub fn typecheck_stmt(
             Ok(())
         }
 
-        // TODO: Done, VERIFY!
         /*
         RHS can be of type UnitType, FuncType or RegType, but we want to only allow Unpacking for RegType,
         if it's not, thow a type Error!
-
-            match rhs_ty {
-                Type::RegType { element_type, dim } => { ... } // valid!
-                _ => Err(TypeError { ... }) // all other types are errors
-            }
         
         After verifying that rhs is a register of the correct dimension (e.g., qubit[3] 
         and lhs is ["a", "b", "c"]), you must assign a type to each new variable on the left.
@@ -204,16 +170,45 @@ pub fn typecheck_stmt(
         }
 
 
+        // Stmt::Return { val, span } => {
+        //     let val_ty = typecheck_expr(val, env)?;
+        //     if &val_ty != expected_ret_type {
+        //         return Err(TypeError {
+        //             kind: TypeErrorKind::MismatchedTypes {
+        //                 expected: format!("{:?}", expected_ret_type),
+        //                 found: format!("{:?}", val_ty),
+        //             },
+        //             span: span.clone(),
+        //         });
+        //     }
+        //     Ok(())
+        // }
+
         Stmt::Return { val, span } => {
             let val_ty = typecheck_expr(val, env)?;
-            if &val_ty != expected_ret_type {
-                return Err(TypeError {
-                    kind: TypeErrorKind::MismatchedTypes {
-                        expected: format!("{:?}", expected_ret_type),
-                        found: format!("{:?}", val_ty),
-                    },
-                    span: span.clone(),
-                });
+            match expected_ret_type {
+                Type::RevFuncType { in_out_ty } => {
+                    if &val_ty != in_out_ty.as_ref() {
+                        return Err(TypeError {
+                            kind: TypeErrorKind::MismatchedTypes {
+                                expected: format!("{:?}", in_out_ty),
+                                found: format!("{:?}", val_ty),
+                            },
+                            span: span.clone(),
+                        });
+                    }
+                }
+                _ => {
+                    if &val_ty != expected_ret_type {
+                        return Err(TypeError {
+                            kind: TypeErrorKind::MismatchedTypes {
+                                expected: format!("{:?}", expected_ret_type),
+                                found: format!("{:?}", val_ty),
+                            },
+                            span: span.clone(),
+                        });
+                    }
+                }
             }
             Ok(())
         }
@@ -524,42 +519,37 @@ fn typecheck_basis(basis: &Basis, env: &mut TypeEnv) -> Result<Type, TypeError> 
 //
 // ─── HELPER METHODS ────────────────────────────────────────────────────────────────
 //
-
-/// Helper function to determine if an expression is inherently reversible.
-/// This function identifies operations that fundamentally break reversibility
-/// (e.g., measurement, discard, classical conditionals).
-/// It returns `Ok(true)` if the expression *can be* reversible, `Ok(false)` if it's not,
-/// and `Err` if a type error prevents analysis.
+/// Determines if an expression is inherently reversible.
 fn is_expr_inherently_reversible(expr: &Expr, env: &mut TypeEnv) -> Result<bool, TypeError> {
     match expr {
-        Expr::Measure {.. } => Ok(false), // Measurement collapses superposition (loses information)
-        Expr::Discard {.. } => Ok(false), // Discard explicitly loses information
-        Expr::Conditional {.. } => Ok(false), // Classical conditionals (if/else) are not allowed in reversible functions [3]
+        // Operations that break reversibility
+        Expr::Measure {.. } => Ok(false),
+        Expr::Discard {.. } => Ok(false),
+        Expr::Conditional {.. } => Ok(false), // Classical conditionals (if/else) are not allowed in reversible functions
 
         Expr::Pipe { lhs, rhs,.. } => {
-            // Both sides of a pipe must be reversible, and the RHS must be a reversible function.
             let lhs_is_rev = is_expr_inherently_reversible(lhs, env)?;
             let rhs_is_rev = is_expr_inherently_reversible(rhs, env)?;
-            if!lhs_is_rev ||!rhs_is_rev {
+            if !lhs_is_rev || !rhs_is_rev {
                 return Ok(false);
             }
 
-            // The RHS of a pipe, when representing a function, must be a reversible function type.
-            let rhs_ty = typecheck_expr(rhs, env)?; // Recursively typecheck to get the actual type of RHS
+            let rhs_ty = typecheck_expr(rhs, env)?;  // Recursively typecheck to get the actual type of RHS
             match rhs_ty {
                 Type::RevFuncType {.. } => Ok(true),
-                _ => Ok(false), // If RHS is not a reversible function, the pipe is not reversible
+                _ => Ok(false),
             }
         }
+
         Expr::Adjoint { func,.. } => {
-            // The function being adjointed must itself be reversible.
             let func_ty = typecheck_expr(func, env)?;
             match func_ty {
                 Type::RevFuncType {.. } => Ok(true),
-                _ => Ok(false), // Adjoint of a non-reversible function is not reversible
+                _ => Ok(false),
             }
         }
-        Expr::BasisTranslation {.. } => Ok(true), // Basis translations are unitary and thus reversible [3, 3]
+
+        Expr::BasisTranslation {.. } => Ok(true),
 
         Expr::Predicated { then_func, else_func,.. } => {
             // Predicated operations can be reversible if both their 'then' and 'else' branches are.
@@ -568,13 +558,11 @@ fn is_expr_inherently_reversible(expr: &Expr, env: &mut TypeEnv) -> Result<bool,
             Ok(then_is_rev && else_is_rev)
         }
 
-        // Other expressions are generally reversible if their components are.
-        // The recursive calls above handle their sub-expressions.
-        // Base cases like literals and variables are inherently reversible.
+        // Base cases - inherently reversible
         Expr::Variable {.. }
         | Expr::UnitLiteral {.. }
-        | Expr::Tensor {.. } // Tensor products are unitary if their components are.
-        | Expr::NonUniformSuperpos {.. } // Superposition literals are states, not operations that lose info.
+        | Expr::Tensor {.. }
+        | Expr::NonUniformSuperpos {.. }
         | Expr::QLit(_) => Ok(true),
     }
 }
@@ -739,5 +727,103 @@ mod tests {
         );
     }
 
-    // TODO: Add more tests for all language constructs! In separate test file? Later
+    // ------------ REVERSIBILITY TEST CASES ----------------
+
+        #[test]
+    fn test_reversible_function_with_irreversible_op_should_fail() {
+        // Function marked reversible but contains a measurement (irreversible)
+        let prog = Program {
+            funcs: vec![
+                FunctionDef::new(
+                    "main".into(),
+                    vec![],
+                    Type::RevFuncType { in_out_ty: Box::new(Type::RegType { elem_ty: RegKind::Qubit, dim: 1 }) },
+                    vec![
+                        Stmt::Assign {
+                            lhs: "x".into(),
+                            rhs: Expr::Measure {
+                                basis: Basis::EmptyBasisLiteral { span: None },
+                                span: None,
+                            },
+                            span: None,
+                        }
+                    ],
+                    true, // is_rev
+                    None,
+                )
+            ],
+            span: None,
+        };
+
+        let result = typecheck_program(&prog);
+        assert!(result.is_err(), "Should fail: reversible function contains measurement");
+    }
+
+    #[test]
+    fn test_adjoint_on_non_reversible_function_should_fail() {
+        // Try to take adjoint of a non-reversible function
+        let mut env = TypeEnv::new();
+        env.insert_var(
+            "f",
+            Type::FuncType {
+                in_ty: Box::new(Type::RegType { elem_ty: RegKind::Qubit, dim: 1 }),
+                out_ty: Box::new(Type::RegType { elem_ty: RegKind::Qubit, dim: 1 }),
+            },
+        );
+        let expr = Expr::Adjoint {
+            func: Box::new(Expr::Variable { name: "f".into(), span: None }),
+            span: None,
+        };
+        let result = typecheck_expr(&expr, &mut env);
+        assert!(result.is_err(), "Should fail: adjoint on non-reversible function");
+    }
+
+    #[test]
+    fn test_adjoint_on_reversible_function_should_pass() {
+        // Try to take adjoint of a reversible function
+        let mut env = TypeEnv::new();
+        env.insert_var(
+            "g",
+            Type::RevFuncType {
+                in_out_ty: Box::new(Type::RegType { elem_ty: RegKind::Qubit, dim: 1 }),
+            },
+        );
+        let expr = Expr::Adjoint {
+            func: Box::new(Expr::Variable { name: "g".into(), span: None }),
+            span: None,
+        };
+        let result = typecheck_expr(&expr, &mut env);
+        assert!(result.is_ok(), "Should succeed: adjoint on reversible function");
+    }
+
+    #[test]
+    fn test_reversible_function_with_only_reversible_ops_should_pass() {
+        // Function marked reversible and only uses reversible ops
+        let prog = Program {
+            funcs: vec![
+                FunctionDef::new(
+                    "main".into(),
+                    vec![(
+                        Type::RegType { elem_ty: RegKind::Qubit, dim: 1 },
+                        "q".into(),
+                    )],
+                    Type::RevFuncType { in_out_ty: Box::new(Type::RegType { elem_ty: RegKind::Qubit, dim: 1 }) },
+                    vec![
+                        Stmt::Return {
+                            val: Expr::Variable { name: "q".into(), span: None },
+                            span: None,
+                        }
+                    ],
+                    true, // is_rev
+                    None,
+                )
+            ],
+            span: None,
+        };
+
+        let result = typecheck_program(&prog);
+        assert!(result.is_ok(), "Should succeed: reversible function with only reversible ops");
+    }
+
+        // TODO: Add more tests for all language constructs! In separate test file? Later
 }
