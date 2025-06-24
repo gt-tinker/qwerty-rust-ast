@@ -6,9 +6,6 @@
 
 use pyo3::prelude::*;
 use ast::ASTNode;
-use dimexpr::DimExpr;
-use dimexpr::*;
-use inference::{ConstraintInfo, Context, DimConstraint};
 use std::collections::HashMap;
 use std::str::FromStr;
 use types::{
@@ -17,9 +14,6 @@ use types::{
 use crate::ast::NodeBox;
 
 mod ast;
-mod basis;
-mod dimexpr;
-mod inference;
 mod types;
 
 

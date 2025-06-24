@@ -10,10 +10,15 @@ import qwerty_ast
 
 def convert_to_qwerty(py_ast):
     print(ast.dump(py_ast, indent=4))
-    if not isinstance(py_ast, (ast.Interactive, ast.Module, ast.Expression)):
+
+    if not isinstance(py_ast, (ast.Interactive, ast.Module)):
         return "Invalid AST"
     
-    value = py_ast.body[0]
+    if (len(py_ast.body) == 1):
+        value = py_ast.body[0]
+    else:
+        return "Invalid body; length of body is not 1"
+    
     if not isinstance(value, ast.Expr):
         return "Invalid syntax; expected an expression"
     
@@ -30,12 +35,10 @@ def convert_expr(node):
     if isinstance(node, ast.Constant):
         val = node.value
         if isinstance(val, str) and all(num in "01" for num in val):
-            tensor = qwerty_ast.NodeBox.new_qubit_tensor(node.value)
-            # print("tensor type:", type(tensor))
-            # print("tensor contents:", dir(tensor))            
+            tensor = qwerty_ast.NodeBox.new_qubit_tensor(node.value)         
             return tensor
         else:
-            raise ValueError("Invalid character, e.g. not 1s and 0s")
+            raise ValueError(f"Invalid character/value: {val}, e.g. not 1s and 0s")
         
     elif isinstance(node, ast.BinOp):
         left = convert_expr(node.left)
@@ -44,6 +47,9 @@ def convert_expr(node):
             return concat_tensors(left, right)
         else:
             raise NotImplementedError("Operation is not supported, only addition for now")
+        
+    else:
+        raise ValueError(f"Unsupported AST node: {type(node).__name__}")
         
     # elif isinstance(node, ast.Name):
     #     symbol_table[node.id] = qwerty_ast.NodeBox.resolve_name(node.id)
@@ -55,7 +61,6 @@ def concat_tensors(left, right):
     left_val = left.get_tensor()
     right_val = right.get_tensor()
     combined = str(left_val) + str(right_val)
-    # print(combined)
     return qwerty_ast.NodeBox.new_qubit_tensor(combined)
 
 # def unpack_ast(ast):
@@ -83,7 +88,7 @@ def concat_tensors(left, right):
 #     and the caller may de-indent source code to avoid angering ``ast.parse()``.
 #     """
 #     return convert_qpu_ast(module, filename, line_offset, col_offset)
-#
+#x
 
 
     

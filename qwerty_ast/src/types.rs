@@ -1,11 +1,11 @@
 // FIXME: Remove later!
 #![allow(unused_imports, dead_code)]
 
-use crate::dimexpr::*;
+// use crate::dimexpr::*;
 use std::any::Any;
 use std::collections::HashMap;
 
-use crate::basis::{QubitLiteral, QubitSymbol};
+// use crate::basis::{ZeroQubit, OneQubit};
 
 // Copying this from ast.hpp => QubitLiteral's definition
 // This selects the eigenvector based on a given PrimitiveBasis

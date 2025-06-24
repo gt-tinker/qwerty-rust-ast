@@ -40,34 +40,13 @@ source venv/bin/activate
 pip install maturin
 ```
 
-### 3. Update `Cargo.toml`
-Navigate to the `qwerty_ast` folder. In `Cargo.toml`, change the line:
-```toml
-pyo3 = { version = "0.22.2", features = ["py-clone"] }
-```
-To:
-```toml
-pyo3 = { version = "0.20", features = ["extension-module", "abi3-py310"] }
-```
-
-### 4. Modify `ast.rs` (if using the `wip/repl` branch)
-Remove `PyFrame` from line 15:
-**Before:**
-```rust
-use pyo3::types::{PyFrame, PyString, PyList};
-```
-**After:**
-```rust
-use pyo3::types::{PyString, PyList};
-```
-
-### 5. Build the Python module
+### 3. Build the Python module
 Run this from the root of the Rust crate:
 ```bash
 maturin develop
 ```
 
-### 6. Run the Qwerty AST
+### 4. Run the Qwerty AST
 Change to the `repl` folder and run:
 ```bash
 python3
