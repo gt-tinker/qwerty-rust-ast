@@ -4,9 +4,7 @@
 
 // FIXME: Remove later!
 #![allow(unused_imports, dead_code)]
-use crate::basis::*;
-use crate::dimexpr::{DimExpr, DimVar, DimVarValue};
-use crate::inference::{ConstraintInfo, Context, DimConstraint};
+
 use crate::types::Type;
 use crate::types::*;
 use num::complex::Complex;
@@ -14,13 +12,12 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyString, PyList};
 use std::collections::{HashMap, HashSet};
-pub use crate::basis::{OneQubit, ZeroQubit};
-use crate::dimexpr::DimExpr::Number;
 
 #[derive(Debug, Clone)]
 pub enum ASTNode {
     ZeroQubit(ZeroQubit),
     OneQubit(OneQubit),
+    QubitRef(usize),
     Tensor(Tensor),
 }
 
@@ -28,10 +25,42 @@ pub enum ASTNode {
 #[pyclass]
 pub struct NodeBox {
     ptr: Box<ASTNode>,
+
 }
+
+pub fn eval(node: &ASTNode) -> Option<ASTNode> {
+    match node {
+        // E-Tens1: match, clone, loop, evaluate
+        ASTNode::Tensor(Tensor { elts, factor, typ }) => {
+            let mut new_elts = elts.clone(); 
+
+            for (i, elt) in elts.iter().enumerate() {
+                if let Some(evaluated_elt) = eval(elt) {
+                    new_elts[i] = evaluated_elt;
+                    return Some(ASTNode::Tensor(Tensor {
+                        elts: new_elts,
+                        factor: factor.clone(),
+                        typ: typ.clone(),
+                    }));
+                }
+            }
+
+            // E-Tens2: fully evaluated to a value ?
+            None
+        }
+
+        // E-QAtom: values so cannot take any more steps
+        ASTNode::ZeroQubit(_) => None,
+        ASTNode::OneQubit(_) => None,
+        ASTNode::QubitRef(_) => None,
+    }
+}
+
+
 
 #[pymethods]
 impl NodeBox {
+
     #[staticmethod]
     fn new_zero_qubit(str: &PyString) -> PyResult<NodeBox> {
         let s = str.to_string();
@@ -41,11 +70,28 @@ impl NodeBox {
         }
         let c = s.as_bytes()[0];
         Ok(NodeBox {
-            ptr: Box::new(ASTNode::ZeroQubit {
-                0: ZeroQubit { sym: c, typ: None },
-            }),
+            ptr: Box::new(ASTNode::ZeroQubit(
+                ZeroQubit { sym: c, typ: None },
+            )),
         })
     }
+
+    // *  is the new + , tens1 and tens2 defines the evaluation order 
+    #[staticmethod]
+    fn new_one_qubit(str: &PyString) -> PyResult<NodeBox> {
+        let s = str.to_string();
+        if s.len() != 1 {
+            // TODO: Check if ASCII encoding and not some silly emoji :)
+            return Err(PyValueError::new_err(format!("bruh wtf is {} ???", s)));
+        }
+        let c = s.as_bytes()[0];
+        Ok(NodeBox {
+            ptr: Box::new(ASTNode::OneQubit(
+                OneQubit { sym: c, typ: None },
+            )),
+        })
+    }
+
     #[staticmethod]
     fn new_tensor(list: &PyList) -> PyResult<NodeBox> {
         let mut nodes = vec![];
@@ -55,7 +101,7 @@ impl NodeBox {
         }
         Ok(NodeBox {
             ptr: Box::new(ASTNode::Tensor {
-                0: Tensor {
+                Tensor {
                     elts: nodes,
                     factor: DimExpr::from(1),
                     typ: None,
@@ -66,19 +112,25 @@ impl NodeBox {
 
     fn get_tensor(&self) -> PyResult<Option<String>> {
         match *self.ptr {
-            ASTNode::ZeroQubit(ref qs) => {
-                Ok(Some((qs.sym as char).to_string()))
+            ASTNode::ZeroQubit(ref zq) => {
+                Ok(Some((zq.sym as char).to_string()))
+            }
+            ASTNode::OneQubit(ref oq) => {
+                Ok(Some((oq.sym as char).to_string()))
             }
             ASTNode::Tensor(ref tensor) => {
                 let mut result = String::new();
 
                 for node in &tensor.elts {
                     match node {
-                        ASTNode::ZeroQubit { 0: ZeroQubit { sym, .. } } => {
+                        ASTNode::ZeroQubit(ZeroQubit { sym, .. } ) => {
+                            result.push(*sym as char);
+                        }
+                        ASTNode::OneQubit(OneQubit { sym, .. } ) => {
                             result.push(*sym as char);
                         }
                         _ => {
-                            return Err(PyValueError::new_err("Tensor contains non-ZeroQubit element"));
+                            return Err(PyValueError::new_err("Tensor contains non-(ZeroQubit/OneQubit) element"));
                         }
                     }
                 }
