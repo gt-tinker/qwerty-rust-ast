@@ -7,6 +7,9 @@ import ast
 import qwerty_ast
 #################### COMMON CODE FOR BOTH @QPU AND @CLASSICAL DSLs ####################
 
+# quick fix, going to create another file most likely for errors
+class QwertySyntaxError(Exception):
+    pass
 
 def convert_to_qwerty(py_ast):
     print(ast.dump(py_ast, indent=4))
@@ -24,9 +27,9 @@ def convert_to_qwerty(py_ast):
     
     try:
         return convert_expr(value.value)
-    except Exception as e:
-        return f"Error: {e}"
     
+    except Exception as e:
+        raise QwertySyntaxError("Just in case some random things gets thru") from e    
 #   1) check if the instance is a binOp, if so, check its left or right values and then perform the binOp. only sum is implemented for now
 #   2) check if the instance is a constant and return it as a tensor, return value in a tensor
 
@@ -38,18 +41,18 @@ def convert_expr(node):
             tensor = qwerty_ast.NodeBox.new_qubit_tensor(node.value)         
             return tensor
         else:
-            raise ValueError(f"Invalid character/value: {val}, e.g. not 1s and 0s")
+            raise QwertySyntaxError(f"Invalid character/value: {val}, e.g. not 1s and 0s")
         
     elif isinstance(node, ast.BinOp):
         left = convert_expr(node.left)
         right = convert_expr(node.right)
-        if isinstance(node.op, ast.Add):
+        if isinstance(node.op, ast.Mult):
             return concat_tensors(left, right)
         else:
             raise NotImplementedError("Operation is not supported, only addition for now")
         
     else:
-        raise ValueError(f"Unsupported AST node: {type(node).__name__}")
+        raise QwertySyntaxError(f"Unsupported AST node: {type(node).__name__}")
         
     # elif isinstance(node, ast.Name):
     #     symbol_table[node.id] = qwerty_ast.NodeBox.resolve_name(node.id)
@@ -63,11 +66,7 @@ def concat_tensors(left, right):
     combined = str(left_val) + str(right_val)
     return qwerty_ast.NodeBox.new_qubit_tensor(combined)
 
-# def unpack_ast(ast):
-#     try:
-#         return ast.body[0].value.value
-#     except AttributeError:
-#         return None
+
 
 
 
