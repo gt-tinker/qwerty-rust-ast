@@ -2,15 +2,14 @@
 
 use super::*;
 
-
 #[test]
 fn test_typecheck_var_and_assign() {
     let prog = Program {
-        funcs: vec![FunctionDef {
-            name: "main".into(),
-            args: vec![(Type::UnitType, "x".into())],
-            ret_type: Type::UnitType,
-            body: vec![Stmt::Assign {
+        funcs: vec![FunctionDef::new(
+            "main".into(),
+            vec![(Type::UnitType, "x".into())],
+            Type::UnitType,
+            vec![Stmt::Assign {
                 lhs: "y".into(),
                 rhs: Expr::Variable {
                     name: "x".into(),
@@ -18,10 +17,12 @@ fn test_typecheck_var_and_assign() {
                 },
                 dbg: None,
             }],
-            dbg: None,
-        }],
+            false,
+            None,
+        )],
         dbg: None,
     };
+
     let result = typecheck_program(&prog);
     assert!(result.is_ok());
 }
@@ -768,6 +769,7 @@ fn test_unpack_assign_typing() {
                 },
                 dbg: None,
             }],
+            is_rev: true,
             dbg: None,
         }],
         dbg: None,
