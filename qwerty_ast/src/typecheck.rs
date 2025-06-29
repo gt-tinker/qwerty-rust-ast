@@ -7,13 +7,6 @@ use std::collections::HashMap;
 use std::iter::zip;
 
 //
-// ─── UNIT TESTS ─────────────────────────────────────────────────────────────────
-//
-
-#[cfg(test)]
-mod core_tests;
-
-//
 // ─── TYPE ENVIRONMENT ───────────────────────────────────────────────────────────
 //
 
@@ -916,3 +909,14 @@ fn infer_function_body_reversibility(
     }
     Ok(is_inferred_reversible)
 }
+
+//
+// ─── UNIT TESTS ─────────────────────────────────────────────────────────────────
+//
+
+#[cfg(test)]
+mod basis_tests;
+#[cfg(test)]
+mod core_tests;
+#[cfg(test)]
+mod vector_qlit_tests;
