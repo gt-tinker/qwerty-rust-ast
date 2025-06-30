@@ -5,7 +5,12 @@
  * This module defines the Abstract Syntax Tree (AST) structures
  * used for parsing and representing QWERTY programs.
  *
- * Version: 1.0
+ * # Changelog
+ *
+ * ## Version 1.1.0
+ * - Added `is_rev` field to `FunctionDef` for reversible function support
+ * - Added `Stmt::Expr` variant to allow standalone expressions as statements
+ *
  */
 
 use crate::dbg::DebugLoc;
@@ -16,7 +21,7 @@ use crate::dbg::DebugLoc;
 pub enum Type {
     FuncType { in_ty: Box<Type>, out_ty: Box<Type> },
     RevFuncType { in_out_ty: Box<Type> },
-    RegType { elem_ty: RegKind, dim: u64 },
+    RegType { elem_ty: RegKind, dim: u64 }, // TODO: dim: DimExpr instead of u64
     UnitType,
 }
 
@@ -248,6 +253,7 @@ pub enum Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
+    Expr(Expr),
     Assign {
         lhs: String,
         rhs: Expr,
@@ -285,7 +291,14 @@ impl FunctionDef {
         is_rev: bool, // passed from the parser
         dbg: Option<DebugLoc>,
     ) -> Self {
-        Self { name, args, ret_type, body, is_rev, dbg }
+        Self {
+            name,
+            args,
+            ret_type,
+            body,
+            is_rev,
+            dbg,
+        }
     }
 
     /// Returns true if the function was explicitly annotated as reversible.

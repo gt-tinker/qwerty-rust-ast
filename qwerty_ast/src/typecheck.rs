@@ -52,6 +52,33 @@ pub fn typecheck_program(prog: &Program) -> Result<(), TypeError> {
     Ok(())
 }
 
+/// Helper function to reconstruct the full function type (FuncType or RevFuncType)
+/// from the FunctionDef's arguments, value return type, and reversibility flag.
+fn get_function_type(func: &FunctionDef) -> Type {
+    let in_ty = if func.args.is_empty() {
+        Type::UnitType
+    } else if func.args.len() == 1 {
+        func.args[0].0.clone()
+    } else {
+        // TODO: For now, if multiple arguments are present and TupleType is not used,
+        // we take the type of the first argument. This needs to be refined
+        // when proper multi-argument function types are introduced (e.g. via TupleType).
+        // TODO: Should fail? Ask Austin
+        func.args[0].0.clone()
+    };
+
+    if func.is_rev {
+        Type::RevFuncType {
+            in_out_ty: Box::new(func.ret_type.clone()),
+        }
+    } else {
+        Type::FuncType {
+            in_ty: Box::new(in_ty),
+            out_ty: Box::new(func.ret_type.clone()),
+        }
+    }
+}
+
 /// Typechecks a single function and its body, including reversibility validation.
 pub fn typecheck_function(func: &FunctionDef) -> Result<(), TypeError> {
     let mut env = TypeEnv::new();
@@ -61,37 +88,20 @@ pub fn typecheck_function(func: &FunctionDef) -> Result<(), TypeError> {
         env.insert_var(name, ty.clone());
     }
 
+    // Reconstruct and bind the function type for higher-order use (e.g. Adjoint, pipes)
+    let full_func_type = get_function_type(func);
+
+    // CRITICAL FIX: Bind the full function type into the environment under the function's name.
+    // This allows expressions like `Adjoint(my_func)` or `q | my_func` to lookup `my_func`
+    // and retrieve its callable type (FuncType/RevFuncType).
+    env.insert_var(&func.name, full_func_type.clone());
+
     let is_annotated_reversible = func.is_rev;
-    let is_signature_reversible = matches!(func.ret_type, Type::RevFuncType { .. }); // TODO: (FIXME) Check RevFuncType or is_reversible?
 
-    // Check annotation matches signature
-    if is_annotated_reversible && !is_signature_reversible {
-        return Err(TypeError {
-            kind: TypeErrorKind::ReversibilityAnnotationMismatch {
-                declared_reversible: true,
-                inferred_reversible: false,
-                func_name: func.name.clone(),
-            },
-            dbg: func.dbg.clone(),
-        });
-    } else if !is_annotated_reversible && is_signature_reversible {
-        return Err(TypeError {
-            kind: TypeErrorKind::ReversibilityAnnotationMismatch {
-                declared_reversible: false,
-                inferred_reversible: true,
-                func_name: func.name.clone(),
-            },
-            dbg: func.dbg.clone(),
-        });
-    }
-
-    let effective_reversible_status = is_annotated_reversible;
-
-    // Validate reversibility (check if declared)
-    if effective_reversible_status {
+    // Validate reversibility (if annotated)
+    if is_annotated_reversible {
         let inferred_body_reversible =
             infer_function_body_reversibility(&func.body, &mut env.clone())?;
-
         if !inferred_body_reversible {
             return Err(TypeError {
                 kind: TypeErrorKind::NonReversibleOperationInReversibleFunction(format!(
@@ -125,6 +135,11 @@ pub fn typecheck_stmt(
     expected_ret_type: &Type,
 ) -> Result<(), TypeError> {
     match stmt {
+        Stmt::Expr(expr) => {
+            typecheck_expr(expr, env)?;
+            Ok(())
+        }
+
         Stmt::Assign { lhs, rhs, dbg } => {
             let rhs_ty = typecheck_expr(rhs, env)?;
             env.insert_var(lhs, rhs_ty); // Shadowing allowed for now.
@@ -154,7 +169,7 @@ pub fn typecheck_stmt(
                             var,
                             Type::RegType {
                                 elem_ty: elem_ty.clone(),
-                                dim: 1,
+                                dim: 1, // TODO: DimExpr check!
                             },
                         );
                     }
@@ -172,6 +187,7 @@ pub fn typecheck_stmt(
 
         Stmt::Return { val, dbg } => {
             let val_ty = typecheck_expr(val, env)?;
+            // TODO: Comparison needs to handle DimExpr equality
             if &val_ty != expected_ret_type {
                 return Err(TypeError {
                     kind: TypeErrorKind::MismatchedTypes {
@@ -200,17 +216,37 @@ pub fn typecheck_expr(expr: &Expr, env: &mut TypeEnv) -> Result<Type, TypeError>
 
         Expr::UnitLiteral { dbg: _ } => Ok(Type::UnitType),
 
-        Expr::Adjoint { func, dbg: _ } => {
+        Expr::Adjoint { func, dbg } => {
             // Adjoint should be a function type (unitary/quantum), not classical.
             let func_ty = typecheck_expr(func, env)?;
-            // TODO: Enforce Qwerty adjoint typing rules.
-            Ok(func_ty)
+
+            match func_ty {
+                Type::RevFuncType { in_out_ty } => Ok(Type::RevFuncType { in_out_ty }),
+                Type::FuncType { .. } => {
+                    // Classical functions cannot have an adjoint
+                    Err(TypeError {
+                        kind: TypeErrorKind::InvalidType(format!(
+                            "Cannot take adjoint of non-reversible function: {:?}",
+                            func_ty
+                        )),
+                        dbg: dbg.clone(),
+                    })
+                }
+                _ => Err(TypeError {
+                    kind: TypeErrorKind::NotCallable(format!(
+                        "Cannot take adjoint of non-function type: {:?}",
+                        func_ty
+                    )),
+                    dbg: dbg.clone(),
+                }),
+            }
         }
 
         Expr::Pipe { lhs, rhs, dbg: _ } => {
             // Typing rule: lhs type must match rhs function input type.
             let lhs_ty = typecheck_expr(lhs, env)?;
             let rhs_ty = typecheck_expr(rhs, env)?;
+
             match &rhs_ty {
                 Type::FuncType { in_ty, out_ty } => {
                     if **in_ty != lhs_ty {
@@ -224,6 +260,20 @@ pub fn typecheck_expr(expr: &Expr, env: &mut TypeEnv) -> Result<Type, TypeError>
                     }
                     Ok((**out_ty).clone())
                 }
+
+                Type::RevFuncType { in_out_ty } => {
+                    if **in_out_ty != lhs_ty {
+                        return Err(TypeError {
+                            kind: TypeErrorKind::MismatchedTypes {
+                                expected: format!("{:?}", in_out_ty),
+                                found: format!("{:?}", lhs_ty),
+                            },
+                            dbg: None,
+                        });
+                    }
+                    Ok((**in_out_ty).clone())
+                }
+
                 _ => Err(TypeError {
                     kind: TypeErrorKind::NotCallable(format!("{:?}", rhs_ty)),
                     dbg: None,
@@ -827,7 +877,8 @@ fn is_expr_inherently_reversible(expr: &Expr, env: &mut TypeEnv) -> Result<bool,
 
             let rhs_ty = typecheck_expr(rhs, env)?; // Recursively typecheck to get the actual type of RHS
             match rhs_ty {
-                Type::RevFuncType { .. } => Ok(true), // TODO: (FIXME) Check RevFuncType or is_reversible?
+                Type::RevFuncType { .. } => Ok(true),
+                Type::FuncType { .. } => Ok(false), // Classical functions break reversibility
                 _ => Ok(false),
             }
         }
@@ -835,7 +886,7 @@ fn is_expr_inherently_reversible(expr: &Expr, env: &mut TypeEnv) -> Result<bool,
         Expr::Adjoint { func, .. } => {
             let func_ty = typecheck_expr(func, env)?;
             match func_ty {
-                Type::RevFuncType { .. } => Ok(true), // TODO: (FIXME) Check RevFuncType or is_reversible?
+                Type::RevFuncType { .. } => Ok(true),
                 _ => Ok(false),
             }
         }
@@ -853,9 +904,20 @@ fn is_expr_inherently_reversible(expr: &Expr, env: &mut TypeEnv) -> Result<bool,
             Ok(then_is_rev && else_is_rev)
         }
 
+        Expr::Variable { name, .. } => {
+            if let Some(var_type) = env.get_var(name) {
+                match var_type {
+                    Type::RevFuncType { .. } => Ok(true),
+                    Type::FuncType { .. } => Ok(false), // Classical functions break reversibility
+                    _ => Ok(true), // Non-function vars don't affect reversibility
+                }
+            } else {
+                Ok(true)
+            }
+        }
+
         // Base cases - inherently reversible
-        Expr::Variable { .. }
-        | Expr::UnitLiteral { .. }
+        Expr::UnitLiteral { .. }
         | Expr::Tensor { .. }
         | Expr::NonUniformSuperpos { .. }
         | Expr::QLit(_) => Ok(true),
@@ -874,18 +936,28 @@ fn infer_function_body_reversibility(
 
     for stmt in body {
         match stmt {
+            Stmt::Expr(expr) => {
+                // Check reversibility of standalone expressions
+                if !is_expr_inherently_reversible(expr, env)? {
+                    is_inferred_reversible = false;
+                    break;
+                }
+            }
+
             Stmt::Assign { rhs, .. } => {
                 if !is_expr_inherently_reversible(rhs, env)? {
                     is_inferred_reversible = false;
                     break;
                 }
             }
+
             Stmt::UnpackAssign { rhs, .. } => {
                 if !is_expr_inherently_reversible(rhs, env)? {
                     is_inferred_reversible = false;
                     break;
                 }
             }
+
             Stmt::Return { val, .. } => {
                 if !is_expr_inherently_reversible(val, env)? {
                     is_inferred_reversible = false;
