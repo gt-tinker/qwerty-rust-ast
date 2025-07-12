@@ -5,12 +5,6 @@
  * This module defines the Abstract Syntax Tree (AST) structures
  * used for parsing and representing QWERTY programs.
  *
- * # Changelog
- *
- * ## Version 1.1.0
- * - Added `is_rev` field to `FunctionDef` for reversible function support
- * - Added `Stmt::Expr` variant to allow standalone expressions as statements
- *
  */
 
 use crate::dbg::DebugLoc;

@@ -96,9 +96,15 @@ pub fn typecheck_function(func: &FunctionDef) -> Result<(), TypeError> {
     // and retrieve its callable type (FuncType/RevFuncType).
     env.insert_var(&func.name, full_func_type.clone());
 
+    // First Pass: Typecheck each statement types
+    let expected_ret_type = &func.ret_type;
+    for stmt in &func.body {
+        typecheck_stmt(stmt, &mut env, expected_ret_type)?;
+    }
+    
     let is_annotated_reversible = func.is_rev;
 
-    // Validate reversibility (if annotated)
+    // Second Pass: Validate reversibility (if annotated)
     if is_annotated_reversible {
         let inferred_body_reversible =
             infer_function_body_reversibility(&func.body, &mut env.clone())?;
@@ -111,12 +117,6 @@ pub fn typecheck_function(func: &FunctionDef) -> Result<(), TypeError> {
                 dbg: func.dbg.clone(),
             });
         }
-    }
-
-    // Typecheck each statement types
-    let expected_ret_type = &func.ret_type;
-    for stmt in &func.body {
-        typecheck_stmt(stmt, &mut env, expected_ret_type)?;
     }
 
     Ok(())
@@ -220,8 +220,21 @@ pub fn typecheck_expr(expr: &Expr, env: &mut TypeEnv) -> Result<Type, TypeError>
             // Adjoint should be a function type (unitary/quantum), not classical.
             let func_ty = typecheck_expr(func, env)?;
 
+            // Must be a reversible function on qubit registers only
             match func_ty {
-                Type::RevFuncType { in_out_ty } => Ok(Type::RevFuncType { in_out_ty }),
+                Type::RevFuncType { in_out_ty } => match *in_out_ty {
+                    Type::RegType { ref elem_ty, dim } if *elem_ty == RegKind::Qubit && dim > 0 => {
+                        Ok(Type::RevFuncType { in_out_ty })
+                    }
+                    _ => Err(TypeError {
+                        kind: TypeErrorKind::InvalidType(format!(
+                            "Adjoint only valid for reversible quantum functions of type qubit[m] (m > 0), found: {:?}",
+                            in_out_ty
+                        )),
+                        dbg: dbg.clone(),
+                    }),
+                },
+
                 Type::FuncType { .. } => {
                     // Classical functions cannot have an adjoint
                     Err(TypeError {
@@ -232,6 +245,7 @@ pub fn typecheck_expr(expr: &Expr, env: &mut TypeEnv) -> Result<Type, TypeError>
                         dbg: dbg.clone(),
                     })
                 }
+                
                 _ => Err(TypeError {
                     kind: TypeErrorKind::NotCallable(format!(
                         "Cannot take adjoint of non-function type: {:?}",
