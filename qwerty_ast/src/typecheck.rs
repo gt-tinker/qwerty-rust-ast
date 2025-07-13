@@ -1,7 +1,6 @@
 //! Qwerty typechecker implementation: walks the AST and enforces all typing rules.
 
 use crate::ast::*;
-use crate::dbg::DebugLoc;
 use crate::error::{TypeError, TypeErrorKind};
 use std::collections::HashMap;
 use std::iter::zip;
@@ -106,10 +105,7 @@ pub fn typecheck_function(func: &FunctionDef) -> Result<(), TypeError> {
         if is_annotated_reversible {
             if !check_stmt_reversibility(stmt, &env)? {
                 return Err(TypeError {
-                    kind: TypeErrorKind::NonReversibleOperationInReversibleFunction(format!(
-                        "Function '{}' is declared @reversible but contains non-reversible operations.",
-                        func.name
-                    )),
+                    kind: TypeErrorKind::NonReversibleOperationInReversibleFunction(func.name.clone()),
                     dbg: func.dbg.clone(),
                 });
             }
@@ -140,7 +136,7 @@ pub fn typecheck_stmt(
             Ok(())
         }
 
-        Stmt::Assign { lhs, rhs, dbg } => {
+        Stmt::Assign { lhs, rhs, dbg: _ } => {
             let rhs_ty = typecheck_expr(rhs, env)?;
             env.insert_var(lhs, rhs_ty); // Shadowing allowed for now.
             Ok(())
@@ -298,7 +294,33 @@ pub fn typecheck_expr(expr: &Expr, env: &mut TypeEnv) -> Result<Type, TypeError>
         Expr::Measure { basis, dbg: _ } => {
             // Qwerty: measurement returns classical result; basis must be valid.
             let basis_ty = typecheck_basis(basis, env)?; //  is it a legal quantum basis?
+            let basis_ty = typecheck_basis(basis, env)?; //  is it a legal quantum basis?
 
+            let basis_dim = if let Type::RegType { elem_ty: RegKind::Basis, dim } = basis_ty {
+                if dim > 0 {
+                    Ok(dim)
+                } else {
+                    Err(TypeError {
+                        kind: TypeErrorKind::EmptyLiteral,
+                        dbg: basis.get_dbg().clone(),
+                    })
+                }
+            } else {
+                Err(TypeError {
+                    kind: TypeErrorKind::InvalidBasis,
+                    dbg: basis.get_dbg().clone(),
+                })
+            }?;
+
+            Ok(Type::FuncType {
+                in_ty: Box::new(Type::RegType {
+                    elem_ty: RegKind::Qubit,
+                    dim: basis_dim,
+                }),
+                out_ty: Box::new(Type::RegType {
+                    elem_ty: RegKind::Bit,
+                    dim: basis_dim,
+                }),
             let basis_dim = if let Type::RegType { elem_ty: RegKind::Basis, dim } = basis_ty {
                 if dim > 0 {
                     Ok(dim)
@@ -362,18 +384,89 @@ pub fn typecheck_expr(expr: &Expr, env: &mut TypeEnv) -> Result<Type, TypeError>
             Ok(t.unwrap_or(Type::UnitType))
         }
 
-        Expr::BasisTranslation { bin, bout, dbg: _ } => {
-            // TODO: Ensure translation is between compatible bases.
-            /*
-            0) ASK Austin!
-            1) Typecheck both bases (already done)
-            2) Extract relevant info from each basis (e.g. dimension, type).
-            3) Compare the properties we care about (e.g. same dimension, same qubit type).
-            4) Return an error if they are not compatible.
-            */
-            typecheck_basis(bin, env)?;
-            typecheck_basis(bout, env)?;
-            Ok(Type::UnitType)
+        Expr::BasisTranslation { bin, bout, dbg } => {
+            let left_ty = typecheck_basis(bin, env)?;
+            let right_ty = typecheck_basis(bout, env)?;
+
+            let result_ty = if let Type::RegType {
+                elem_ty: RegKind::Basis,
+                dim,
+            } = left_ty
+            {
+                if dim == 0 {
+                    return Err(TypeError {
+                        kind: TypeErrorKind::EmptyLiteral,
+                        dbg: bin.get_dbg(),
+                    });
+                }
+
+                // Type of this basis translation (pending further checks)
+                Type::RevFuncType {
+                    in_out_ty: Box::new(Type::RegType {
+                        elem_ty: RegKind::Qubit,
+                        dim: dim,
+                    }),
+                }
+            } else {
+                return Err(TypeError {
+                    kind: TypeErrorKind::InvalidBasis,
+                    dbg: bin.get_dbg(),
+                });
+            };
+
+            if left_ty != right_ty {
+                return Err(TypeError {
+                    kind: TypeErrorKind::DimMismatch,
+                    dbg: dbg.clone(),
+                });
+            }
+
+            for b in [bin, bout] {
+                if b.get_atom_indices(VectorAtomKind::TargetAtom)
+                    .is_none_or(|indices| !indices.is_empty())
+                {
+                    return Err(TypeError {
+                        kind: TypeErrorKind::MismatchedAtoms {
+                            atom_kind: VectorAtomKind::TargetAtom,
+                        },
+                        dbg: b.get_dbg(),
+                    });
+                }
+            }
+
+            let pad_indices_in =
+                bin.get_atom_indices(VectorAtomKind::PadAtom)
+                    .ok_or(TypeError {
+                        kind: TypeErrorKind::MismatchedAtoms {
+                            atom_kind: VectorAtomKind::PadAtom,
+                        },
+                        dbg: bin.get_dbg(),
+                    })?;
+            let pad_indices_out =
+                bout.get_atom_indices(VectorAtomKind::PadAtom)
+                    .ok_or(TypeError {
+                        kind: TypeErrorKind::MismatchedAtoms {
+                            atom_kind: VectorAtomKind::PadAtom,
+                        },
+                        dbg: bout.get_dbg(),
+                    })?;
+            if pad_indices_in != pad_indices_out {
+                return Err(TypeError {
+                    kind: TypeErrorKind::MismatchedAtoms {
+                        atom_kind: VectorAtomKind::PadAtom,
+                    },
+                    dbg: dbg.clone(),
+                });
+            }
+
+            if !basis_span_equiv(bin, bout) {
+                Err(TypeError {
+                    kind: TypeErrorKind::SpanMismatch,
+                    dbg: dbg.clone(),
+                })
+            } else {
+                Ok(result_ty)
+            }
         }
 
         Expr::Predicated {
@@ -475,34 +568,13 @@ pub fn typecheck_expr(expr: &Expr, env: &mut TypeEnv) -> Result<Type, TypeError>
             Ok(t_ty)
         }
 
-        Expr::QLit(qlit) => typecheck_qlit(qlit, env),
+        Expr::QLit { qlit, dbg: _ } => typecheck_qlit(qlit, env),
     }
 }
 
 //
 // ─── HELPER METHODS ────────────────────────────────────────────────────────────────
 //
-
-/// Tolerance for floating point comparison
-const ATOL: f64 = 1e-12;
-
-/// Returns true iff the two phases are the same angle (up to a multiple of 360)
-fn on_phase(angle_deg1: f64, angle_deg2: f64) -> bool {
-    let diff = angle_deg1 - angle_deg2;
-    let modulo = diff % 360.0;
-    modulo.abs() < ATOL
-}
-
-/// Returns true iff the two phases differ by 180 degrees (up to a multiple of
-/// 360)
-fn off_phase(angle_deg1: f64, angle_deg2: f64) -> bool {
-    let diff = angle_deg1 - angle_deg2;
-    let mut modulo = diff % 360.0;
-    if modulo < 0.0 {
-        modulo = -modulo;
-    }
-    (modulo - 180.0).abs() < ATOL
-}
 
 /// Implements the O-Shuf and O-Tens rules by scanning a pair of tensor
 /// products elementwise for any pair of orthogonal vectors. If it finds one,
@@ -519,7 +591,7 @@ fn tensors_are_ortho(bvs1: &[Vector], bvs2: &[Vector]) -> bool {
     // First, make sure dimension line up so that our orthogonality check even
     // makes sense. This assumes that there are no nested tensors
     for (bv_1, bv_2) in zip(bvs1, bvs2) {
-        match (bv_1.get_dim(), bv_2.get_dim()) {
+        match (bv_1.get_explicit_dim(), bv_2.get_explicit_dim()) {
             (Some(dim1), Some(dim2)) if dim1 == dim2 => {
                 // keep going
             }
@@ -558,8 +630,8 @@ fn supneg_ortho(
     bv_1a == bv_1b
         && bv_2a == bv_2b
         && basis_vectors_are_ortho(bv_1a, bv_2a)
-        && (on_phase(angle_deg_1a, angle_deg_2a) && off_phase(angle_deg_1b, angle_deg_2b)
-            || off_phase(angle_deg_1a, angle_deg_2a) && on_phase(angle_deg_1b, angle_deg_2b))
+        && (in_phase(angle_deg_1a, angle_deg_2a) && anti_phase(angle_deg_1b, angle_deg_2b)
+            || anti_phase(angle_deg_1a, angle_deg_2a) && in_phase(angle_deg_1b, angle_deg_2b))
 }
 
 /// Checks whether `(bv_1a + bv_2a) _|_ (bv_1b + bv_2b)` using the O-Sup
@@ -693,7 +765,7 @@ fn superpos_are_ortho_sym(
 
 /// Determine if basis vectors are orthogonal without using O-Sym
 fn basis_vectors_are_ortho_nosym(bv_1: &Vector, bv_2: &Vector) -> bool {
-    // TODO: need to normalize first, i.e., remove nested tensors
+    // TODO: need to canonicalize first, i.e., remove nested tensors
     match (bv_1, bv_2) {
         (Vector::ZeroVector { .. }, Vector::OneVector { .. }) => true, // O-Std
 
@@ -727,7 +799,7 @@ fn basis_vectors_are_ortho_nosym(bv_1: &Vector, bv_2: &Vector) -> bool {
     }
 }
 
-/// Determine if two basis vectors are orthogonal using all available
+/// Determines if two basis vectors are orthogonal using all available
 /// orthogonality rules. Practically, this means attempting
 /// `basis_vectors_are_ortho()` and then trying again after applying O-Sym.
 fn basis_vectors_are_ortho(bv_1: &Vector, bv_2: &Vector) -> bool {
@@ -735,6 +807,99 @@ fn basis_vectors_are_ortho(bv_1: &Vector, bv_2: &Vector) -> bool {
     basis_vectors_are_ortho_nosym(bv_1, bv_2) || basis_vectors_are_ortho_nosym(bv_2, bv_1)
 }
 
+/// Attempts to factors the small basis from the big basis and return the
+/// remainder. Based on Algorithm B2 of the CGO '25 paper.
+fn factor_basis(small: &Basis, small_dim: usize, big: &Basis, big_dim: usize) -> Option<Basis> {
+    assert!(
+        big_dim > small_dim,
+        concat!(
+            "Expected to factor a bigger basis from a smaller basis but ",
+            "instead you are asking me to factor a {}-qubit basis from a ",
+            "{}-qubit basis, and {} >= {}."
+        ),
+        small_dim,
+        big_dim,
+        small_dim,
+        big_dim,
+    );
+
+    if small.fully_spans() && big.fully_spans() {
+        let delta = big_dim - small_dim;
+        // Return std[𝛿] as the remainder
+        Some(Basis::std(delta, big.get_dbg().clone()))
+    } else if small.fully_spans() {
+        // big does not fully span and it is a basis literal. We need to try
+        // and factor a fully-spanning 𝛿-qubit basis out of it.
+        // TODO: implement me
+        None
+    } else {
+        // Neither small nor big fully spans. Both are basis literals. Cross
+        // your fingers.
+        // TODO: implement me
+        None
+    }
+}
+
+/// Returns true if both bases have the same span. Assumes that both bases
+/// individually passed type checking. This is Algorithm B1 in the CGO '25
+/// paper.
+fn basis_span_equiv(b1: &Basis, b2: &Basis) -> bool {
+    let mut b1_stack = b1.make_explicit().canonicalize().normalize().to_stack();
+    let mut b2_stack = b2.make_explicit().canonicalize().normalize().to_stack();
+
+    loop {
+        match (b1_stack.pop(), b2_stack.pop()) {
+            // Done
+            (None, None) => return true,
+
+            // Dimension mismatch
+            (Some(_), None) | (None, Some(_)) => return false,
+
+            (Some(be1), Some(be2)) => {
+                match (be1.get_dim(), be2.get_dim()) {
+                    // Malformed basis
+                    (None, _) | (_, None) => return false,
+
+                    (Some(be1_dim), Some(be2_dim)) => {
+                        if be1_dim == be2_dim {
+                            if be1.fully_spans() && be2.fully_spans()
+                                || be1.strip_dbg() == be2.strip_dbg()
+                            {
+                                // Looks good. Keep going
+                            } else {
+                                // Nothing to factor. Game over
+                                return false;
+                            }
+                        } else if be1_dim < be2_dim {
+                            match factor_basis(&be1, be1_dim, &be2, be2_dim) {
+                                Some(remainder) => {
+                                    b2_stack.push(remainder);
+                                }
+                                None => {
+                                    // Couldn't factor
+                                    return false;
+                                }
+                            }
+                        } else {
+                            // be1_dim > be2_dim
+                            match factor_basis(&be2, be2_dim, &be1, be1_dim) {
+                                Some(remainder) => {
+                                    b1_stack.push(remainder);
+                                }
+                                None => {
+                                    // Couldn't factor
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Returns true if two qubit literals can be proven to be orthogonal.
 fn qlits_are_ortho(qlit1: &QLit, qlit2: &QLit) -> bool {
     basis_vectors_are_ortho(
         &qlit1.convert_to_basis_vector(),
@@ -811,7 +976,16 @@ fn typecheck_vector(vector: &Vector, _env: &mut TypeEnv) -> Result<Type, TypeErr
             dim: 1,
         }),
 
-        Vector::VectorTilt { q, .. } => typecheck_vector(q, _env),
+        Vector::VectorTilt { q, angle_deg, dbg } => {
+            if !angle_deg.is_finite() {
+                Err(TypeError {
+                    kind: TypeErrorKind::InvalidFloat { float: *angle_deg },
+                    dbg: dbg.clone(),
+                })
+            } else {
+                typecheck_vector(q, _env)
+            }
+        }
 
         Vector::UniformVectorSuperpos { q1, q2, .. } => {
             let t1 = typecheck_vector(q1, _env)?;
@@ -915,7 +1089,7 @@ fn typecheck_basis(basis: &Basis, env: &mut TypeEnv) -> Result<Type, TypeError> 
                 Ok(Type::RegType {
                     elem_ty: RegKind::Basis,
                     dim: *dim,
-                }) // TODO: Should this return a Basis type?
+                })
             } else {
                 Err(TypeError {
                     kind: TypeErrorKind::InvalidBasis,
@@ -924,7 +1098,10 @@ fn typecheck_basis(basis: &Basis, env: &mut TypeEnv) -> Result<Type, TypeError> 
             }
         }
 
-        Basis::EmptyBasisLiteral { .. } => Ok(Type::UnitType),
+        Basis::EmptyBasisLiteral { .. } => Ok(Type::RegType {
+            elem_ty: RegKind::Basis,
+            dim: 0,
+        }),
 
         Basis::BasisTensor { bases, .. } => {
             for b in bases {
@@ -1024,8 +1201,8 @@ fn is_expr_inherently_reversible(expr: &Expr, env: &mut TypeEnv) -> Result<bool,
 //
 
 #[cfg(test)]
-mod basis_tests;
+mod test_typecheck_basis;
 #[cfg(test)]
-mod core_tests;
+mod test_typecheck_core;
 #[cfg(test)]
-mod vector_qlit_tests;
+mod test_typecheck_vec_qlit;
