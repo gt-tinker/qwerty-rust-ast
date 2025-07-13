@@ -385,16 +385,52 @@ pub fn typecheck_expr(expr: &Expr, env: &mut TypeEnv) -> Result<Type, TypeError>
             let t_ty = typecheck_expr(then_func, env)?;
             let e_ty = typecheck_expr(else_func, env)?;
             let _pred_ty = typecheck_basis(pred, env)?;
-            if t_ty != e_ty {
-                return Err(TypeError {
-                    kind: TypeErrorKind::MismatchedTypes {
-                        expected: format!("{:?}", t_ty),
-                        found: format!("{:?}", e_ty),
-                    },
-                    dbg: None,
-                });
+            
+            // Ensure both operands are reversible functions (Same signature required)
+            match (&t_ty, &e_ty) {
+                (Type::RevFuncType { in_out_ty: t_in_out }, Type::RevFuncType { in_out_ty: e_in_out }) => {
+                    if t_in_out != e_in_out {
+                        return Err(TypeError {
+                            kind: TypeErrorKind::MismatchedTypes {
+                                expected: format!("{:?}", t_ty),
+                                found: format!("{:?}", e_ty),
+                            },
+                            dbg: None,
+                        });
+                    }
+                    Ok(t_ty)
+                }
+
+                (Type::RevFuncType { .. }, _) => {
+                    Err(TypeError {
+                        kind: TypeErrorKind::InvalidType(format!(
+                            "Predicated expression requires both operands to be reversible functions, but 'else' branch has type: {:?}",
+                            e_ty
+                        )),
+                        dbg: None,
+                    })
+                }
+
+                (_, Type::RevFuncType { .. }) => {
+                    Err(TypeError {
+                        kind: TypeErrorKind::InvalidType(format!(
+                            "Predicated expression requires both operands to be reversible functions, but 'then' branch has type: {:?}",
+                            t_ty
+                        )),
+                        dbg: None,
+                    })
+                }
+                
+                (_, _) => {
+                    Err(TypeError {
+                        kind: TypeErrorKind::InvalidType(format!(
+                            "Predicated expression requires both operands to be reversible functions, found: then={:?}, else={:?}",
+                            t_ty, e_ty
+                        )),
+                        dbg: None,
+                    })
+                }
             }
-            Ok(t_ty)
         }
 
         Expr::NonUniformSuperpos { pairs, dbg: _ } => {
