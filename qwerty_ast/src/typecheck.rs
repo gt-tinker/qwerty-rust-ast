@@ -294,33 +294,7 @@ pub fn typecheck_expr(expr: &Expr, env: &mut TypeEnv) -> Result<Type, TypeError>
         Expr::Measure { basis, dbg: _ } => {
             // Qwerty: measurement returns classical result; basis must be valid.
             let basis_ty = typecheck_basis(basis, env)?; //  is it a legal quantum basis?
-            let basis_ty = typecheck_basis(basis, env)?; //  is it a legal quantum basis?
 
-            let basis_dim = if let Type::RegType { elem_ty: RegKind::Basis, dim } = basis_ty {
-                if dim > 0 {
-                    Ok(dim)
-                } else {
-                    Err(TypeError {
-                        kind: TypeErrorKind::EmptyLiteral,
-                        dbg: basis.get_dbg().clone(),
-                    })
-                }
-            } else {
-                Err(TypeError {
-                    kind: TypeErrorKind::InvalidBasis,
-                    dbg: basis.get_dbg().clone(),
-                })
-            }?;
-
-            Ok(Type::FuncType {
-                in_ty: Box::new(Type::RegType {
-                    elem_ty: RegKind::Qubit,
-                    dim: basis_dim,
-                }),
-                out_ty: Box::new(Type::RegType {
-                    elem_ty: RegKind::Bit,
-                    dim: basis_dim,
-                }),
             let basis_dim = if let Type::RegType { elem_ty: RegKind::Basis, dim } = basis_ty {
                 if dim > 0 {
                     Ok(dim)
