@@ -902,11 +902,7 @@ fn typecheck_basis(basis: &Basis, env: &mut TypeEnv) -> Result<Type, TypeError> 
 /// Determines if an expression is inherently reversible.
 fn is_expr_inherently_reversible(expr: &Expr, env: &mut TypeEnv) -> Result<bool, TypeError> {
     match expr {
-        // NOTE: Creating a measurement function is reversible (unused function reference) - only calling it breaks reversibility
-        Expr::Measure { .. } => Ok(true),
-        Expr::Discard { .. } => Ok(false),
-        Expr::Conditional { .. } => Ok(false), // Classical conditionals (if/else) are not allowed in reversible functions
-
+        // Execution points that can break reversibility
         Expr::Pipe { lhs, rhs, .. } => {
             let lhs_is_rev = is_expr_inherently_reversible(lhs, env)?;
             let rhs_is_rev = is_expr_inherently_reversible(rhs, env)?;
@@ -914,52 +910,50 @@ fn is_expr_inherently_reversible(expr: &Expr, env: &mut TypeEnv) -> Result<bool,
                 return Ok(false);
             }
 
-            let rhs_ty = typecheck_expr(rhs, env)?; // Recursively typecheck to get the actual type of RHS
+            let rhs_ty = typecheck_expr(rhs, env)?; // Get the actual type being called
             match rhs_ty {
                 Type::RevFuncType { .. } => Ok(true),
-                Type::FuncType { .. } => Ok(false), // Classical functions break reversibility
-                _ => Ok(false),
+                Type::FuncType { .. } => Ok(false), // Calling irreversible function breaks reversibility
+                _ => Ok(false), // Invalid function call
             }
         }
 
+        // Classical control flow breaks reversibility
+        Expr::Conditional { .. } => Ok(false),
+
+        // Active expressions that need explicit checking
         Expr::Adjoint { func, .. } => {
             let func_ty = typecheck_expr(func, env)?;
             match func_ty {
                 Type::RevFuncType { .. } => Ok(true),
-                _ => Ok(false),
+                _ => Ok(false), // Adjoint only works on reversible functions
             }
         }
-
-        Expr::BasisTranslation { .. } => Ok(true),
 
         Expr::Predicated {
             then_func,
             else_func,
             ..
         } => {
-            // Predicated operations can be reversible if both their 'then' and 'else' branches are.
+            // Predicated operations are reversible only if both branches are reversible
             let then_is_rev = is_expr_inherently_reversible(then_func, env)?;
             let else_is_rev = is_expr_inherently_reversible(else_func, env)?;
             Ok(then_is_rev && else_is_rev)
         }
 
-        Expr::Variable { name, .. } => {
-            if let Some(var_type) = env.get_var(name) {
-                match var_type {
-                    Type::RevFuncType { .. } => Ok(true),
-                    Type::FuncType { .. } => Ok(false), // Classical functions break reversibility
-                    _ => Ok(true), // Non-function vars don't affect reversibility
-                }
-            } else {
+        Expr::Variable { name, dbg } => {
+            if env.get_var(name).is_some() {
                 Ok(true)
+            } else {
+                Err(TypeError {
+                    kind: TypeErrorKind::UndefinedVariable(name.clone()),
+                    dbg: dbg.clone(),
+                })
             }
         }
 
-        // Base cases - inherently reversible
-        Expr::UnitLiteral { .. }
-        | Expr::Tensor { .. }
-        | Expr::NonUniformSuperpos { .. }
-        | Expr::QLit(_) => Ok(true),
+        // Everything else is reversible by default (actual checks for non-reversibity done during execution call)
+        _ => Ok(true),
     }
 }
 
