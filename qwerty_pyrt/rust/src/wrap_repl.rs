@@ -1,3 +1,6 @@
+//! Wraps qwerty_ast::repl::ReplState in a Python object. Used by repl.py to
+//! run the Qwerty REPL.
+
 use crate::wrap_ast::Expr;
 use pyo3::prelude::*;
 use qwerty_ast::repl;
