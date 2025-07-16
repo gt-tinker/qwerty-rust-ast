@@ -1236,20 +1236,30 @@ def convert_qpu_ast(module: ast.Module, name_generator: Callable[[str], str],
     visitor = QpuVisitor(name_generator, filename, line_offset, col_offset)
     return visitor.visit_Module(module)
 
-#def convert_qpu_expr(expr: ast.Expression, filename: str = '',
-#                     line_offset: int = 0, col_offset: int = 0,
-#                     no_pyframe: bool = False) -> Expr:
+# pass into some code that implements this
+
+def convert_qpu_repl(root: ast.Interactive,
+                    no_pyframe: bool = False) -> Expr:
 #    """
 #    Convert an expression from a @qpu kernel instead of the whole thing.
 #    Currently used only in unit tests. Someday could be used in a REPL, for
 #    example.
 #    """
-#    if not isinstance(expr, ast.Expression):
-#        raise QwertySyntaxError('Expected top-level Expression node in '
-#                                'Python AST', None) # This should not happen
-#
-#    visitor = QpuVisitor(filename, line_offset, col_offset, no_pyframe)
-#    return visitor.visit_Expression(expr)
+    if not isinstance(root, ast.Interactive):
+        raise QwertySyntaxError('Expected top-level Interactive node in '
+                               'Python AST', None) # This should not happen\
+    if len(root.body) != 1:
+        raise QwertySyntaxError('Length of root != 1')
+    
+    statement = root.body[0]
+
+    if not isinstance(statement, ast.Expr):
+        raise QwertySyntaxError('Statement is not an expression')
+    
+    expr = statement.value
+
+    visitor = QpuVisitor(lambda name: name, "", 0, 0, no_pyframe)
+    return visitor.visit(expr)
 
 #################### @CLASSICAL DSL ####################
 

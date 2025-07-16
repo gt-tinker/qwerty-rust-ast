@@ -1,8 +1,10 @@
 mod mlir;
 mod wrap_ast;
+mod wrap_repl;
 
 use pyo3::prelude::*;
 use wrap_ast::{Basis, DebugLoc, Expr, FunctionDef, Program, QLit, RegKind, Stmt, Type, Vector};
+use wrap_repl::ReplState;
 
 /// The Python extension module allowing the Python portion of the Qwerty
 /// runtime to communicate with the Rust and C++ portions of the runtime.
@@ -22,6 +24,7 @@ fn qwerty_pyrt(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Stmt>()?;
     module.add_class::<FunctionDef>()?;
     module.add_class::<Program>()?;
+    module.add_class::<ReplState>()?;
 
     Ok(())
 }

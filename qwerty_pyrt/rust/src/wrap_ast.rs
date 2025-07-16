@@ -305,7 +305,7 @@ impl Basis {
 #[pyclass]
 #[derive(Clone)]
 pub struct Expr {
-    expr: ast::Expr,
+    pub(crate) expr: ast::Expr,
 }
 
 #[pymethods]
