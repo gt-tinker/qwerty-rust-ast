@@ -1,13 +1,14 @@
+use crate::wrap_ast::Expr;
 use pyo3::prelude::*;
 use qwerty_ast::repl;
-use crate::wrap_ast::Expr;
-// use std::sync::Mutex;
+use std::sync::Mutex;
 
 #[pyclass]
-#[derive(Clone)]
 pub struct ReplState {
-    // state: Mutex<repl::ReplState>
-    state: repl::ReplState
+    // Mutex used here because PyO3 requires #[pyclass]es to be Sync, i.e.,
+    // threadsafe, but ReplState is not Sync because it contains QuantumSim
+    // which contains a non-Sync RefCell.
+    state: Mutex<repl::ReplState>,
 }
 
 #[pymethods]
@@ -15,12 +16,11 @@ impl ReplState {
     #[new]
     fn new() -> Self {
         Self {
-            state: repl::ReplState::new(),
+            state: Mutex::new(repl::ReplState::new()),
         }
     }
 
     fn run(&self, expr: Expr) {
-        // TODO run
-        self.state.run(&expr.expr)
+        self.state.lock().unwrap().run(&expr.expr)
     }
 }

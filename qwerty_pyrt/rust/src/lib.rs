@@ -2,9 +2,11 @@ mod mlir;
 mod wrap_ast;
 mod wrap_repl;
 
+use crate::wrap_ast::{
+    Basis, DebugLoc, Expr, FunctionDef, Program, QLit, RegKind, Stmt, Type, Vector,
+};
+use crate::wrap_repl::ReplState;
 use pyo3::prelude::*;
-use wrap_ast::{Basis, DebugLoc, Expr, FunctionDef, Program, QLit, RegKind, Stmt, Type, Vector};
-use wrap_repl::ReplState;
 
 /// The Python extension module allowing the Python portion of the Qwerty
 /// runtime to communicate with the Rust and C++ portions of the runtime.
