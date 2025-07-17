@@ -7,8 +7,6 @@
 #include "mlir/IR/Types.h"
 #include "mlir/IR/BuiltinTypes.h"
 
-#include "CCirc/IR/CCircInterfaces.h"
-
 #define GET_TYPEDEF_CLASSES
 #include "CCirc/IR/CCircOpsTypes.h.inc"
 

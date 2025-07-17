@@ -1,6 +1,5 @@
-//add_mlir_dialect_library(MLIRCCircTransforms
-  DISABLE_INSTALL
-
+add_mlir_dialect_library(MLIRCCircTransforms
+  CCircToQCircConversionPass.cpp
 
   DEPENDS
   MLIRCCircPassIncGen

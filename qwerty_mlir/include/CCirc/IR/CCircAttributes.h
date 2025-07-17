@@ -4,7 +4,6 @@
 #ifndef DIALECT_INCLUDE_CCIRC_IR_CCIRC_ATTRIBUTES_H
 #define DIALECT_INCLUDE_CCIRC_IR_CCIRC_ATTRIBUTES_H
 
-#include "CCirc/IR/CCircOpsEnums.h.inc"
 #define GET_ATTRDEF_CLASSES
 #include "CCirc/IR/CCircOpsAttributes.h.inc"
 

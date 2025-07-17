@@ -50,20 +50,7 @@ void CCircDialect::initialize() {
 #include "CCirc/IR/CCircOps.cpp.inc"
     >();
 
-    addInterfaces<CCircInlinerInterface,
-                  CCircLLVMIRTranslationInterface>();
-}
-
-void registerCCircDialectTranslation(mlir::DialectRegistry &registry) {
-    // This will actually register the translation interface in
-    // CCircDialect::initialize() (see above)
-    registry.insert<CCircDialect>();
-    // ...so we don't need to do something like this, even though the `llvm'
-    // dialect in MLIR does (why? the LLVM dialect does not register this
-    // interface itself as we do above):
-    //registry.addExtension(+[](mlir::MLIRContext *ctx, CCircDialect *dialect) {
-    //    dialect->addInterfaces<CCircLLVMIRTranslationInterface>();
-    //});
+    addInterfaces<CCircInlinerInterface>();
 }
 
 } // namespace qcirc

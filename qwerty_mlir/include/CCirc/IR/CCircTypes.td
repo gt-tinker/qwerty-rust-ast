@@ -5,7 +5,6 @@
 #define DIALECT_INCLUDE_CCIRC_IR_CCIRC_TYPES_TD
 
 include "CCirc/IR/CCircDialect.td"
-include "CCirc/IR/CCircInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
@@ -15,7 +14,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 // Base qcirc type definition.
 //===----------------------------------------------------------------------===//
 
-class CCirc_Type<string name, string typeMnemonic :
+class CCirc_Type<string name, string typeMnemonic, list<Trait> traits = []> :
         TypeDef<CCirc_Dialect, name, traits> {
     let mnemonic = typeMnemonic;
 }

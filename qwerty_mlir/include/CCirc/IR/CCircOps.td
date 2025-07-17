@@ -6,7 +6,6 @@
 
 include "CCirc/IR/CCircDialect.td"
 include "CCirc/IR/CCircAttributes.td"
-include "CCirc/IR/CCircInterfaces.td"
 
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
@@ -14,7 +13,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 
 def CCirc_AndOp : CCirc_Op<"and", [
-        Pure, InferTypeOpAdaptor]> {
+        Pure]> {
     let summary = "A quantum gate with 2 targets and no real-valued parameters";
     let description = [{
         Dataflow semantics two-qubit quantum gate with a variable number of
