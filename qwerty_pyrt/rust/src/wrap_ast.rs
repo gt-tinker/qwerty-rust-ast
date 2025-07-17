@@ -1,4 +1,3 @@
-use std::fmt;
 use crate::mlir::run_ast;
 use dashu::integer::UBig;
 use pyo3::{
@@ -7,6 +6,7 @@ use pyo3::{
     types::{PyBytes, PyInt, PyType},
 };
 use qwerty_ast::{ast, dbg, typecheck};
+use std::fmt;
 
 static BIT_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();
 static QWERTY_PROGRAMMER_ERROR_TYPE: GILOnceCell<Py<PyType>> = GILOnceCell::new();

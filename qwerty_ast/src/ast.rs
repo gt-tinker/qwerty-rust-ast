@@ -832,7 +832,6 @@ impl fmt::Display for Vector {
     }
 }
 
-
 // ----- Basis -----
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1222,13 +1221,13 @@ pub enum Expr {
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expr::Variable { name, ..} => write!(f, "{}", name),
-            Expr::UnitLiteral { ..} => write!(f, "[]"),
-            Expr::Adjoint { func, ..} => write!(f, "~({})", **func),
-            Expr::Pipe { lhs, rhs, ..} => write!(f, "({}) | ({})", **lhs, **rhs),
-            Expr::Measure { basis, ..} => write!(f, "({}).measure", basis),
-            Expr::Discard { ..} => write!(f, "discard"),
-            Expr::Tensor { vals, ..} => {
+            Expr::Variable { name, .. } => write!(f, "{}", name),
+            Expr::UnitLiteral { .. } => write!(f, "[]"),
+            Expr::Adjoint { func, .. } => write!(f, "~({})", **func),
+            Expr::Pipe { lhs, rhs, .. } => write!(f, "({}) | ({})", **lhs, **rhs),
+            Expr::Measure { basis, .. } => write!(f, "({}).measure", basis),
+            Expr::Discard { .. } => write!(f, "discard"),
+            Expr::Tensor { vals, .. } => {
                 for (i, val) in vals.iter().enumerate() {
                     if i > 0 {
                         write!(f, "*")?;
@@ -1238,7 +1237,12 @@ impl fmt::Display for Expr {
                 Ok(())
             }
             Expr::BasisTranslation { bin, bout, .. } => write!(f, "({}) >> ({})", bin, bout),
-            Expr::Predicated { then_func, else_func, pred, .. } => write!(f, "{} if {} else {}", then_func, pred, else_func),
+            Expr::Predicated {
+                then_func,
+                else_func,
+                pred,
+                ..
+            } => write!(f, "{} if {} else {}", then_func, pred, else_func),
             Expr::NonUniformSuperpos { pairs, .. } => {
                 for (i, (prob, qlit)) in pairs.iter().enumerate() {
                     if i > 0 {
@@ -1248,7 +1252,12 @@ impl fmt::Display for Expr {
                 }
                 Ok(())
             }
-            Expr::Conditional { then_expr, else_expr, cond, .. } => write!(f, "{} if {} else {}", then_expr, cond, else_expr),
+            Expr::Conditional {
+                then_expr,
+                else_expr,
+                cond,
+                ..
+            } => write!(f, "{} if {} else {}", then_expr, cond, else_expr),
             Expr::QLit { qlit, .. } => write!(f, "{}", qlit),
         }
     }
