@@ -1242,7 +1242,7 @@ impl fmt::Display for Expr {
                 else_func,
                 pred,
                 ..
-            } => write!(f, "{} if {} else {}", then_func, pred, else_func),
+            } => write!(f, "({}) if ({}) else ({})", then_func, pred, else_func),
             Expr::NonUniformSuperpos { pairs, .. } => {
                 for (i, (prob, qlit)) in pairs.iter().enumerate() {
                     if i > 0 {
@@ -1257,7 +1257,7 @@ impl fmt::Display for Expr {
                 else_expr,
                 cond,
                 ..
-            } => write!(f, "{} if {} else {}", then_expr, cond, else_expr),
+            } => write!(f, "({}) if ({}) else ({})", then_expr, cond, else_expr),
             Expr::QLit { qlit, .. } => write!(f, "{}", qlit),
         }
     }
