@@ -1,3 +1,4 @@
+use std::fmt;
 use crate::mlir::run_ast;
 use dashu::integer::UBig;
 use pyo3::{
@@ -313,10 +314,22 @@ impl Basis {
     }
 }
 
-#[pyclass]
+#[pyclass(str)]
 #[derive(Clone)]
 pub struct Expr {
     pub(crate) expr: ast::Expr,
+}
+
+impl Expr {
+    pub fn new(expr: ast::Expr) -> Self {
+        Self { expr }
+    }
+}
+
+impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.expr)
+    }
 }
 
 #[pymethods]

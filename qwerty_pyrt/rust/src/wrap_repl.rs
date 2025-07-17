@@ -6,6 +6,7 @@ use pyo3::prelude::*;
 use qwerty_ast::repl;
 use std::sync::Mutex;
 
+/// Thin wrapper for qwerty_ast::repl::ReplState.
 #[pyclass]
 pub struct ReplState {
     // Mutex used here because PyO3 requires #[pyclass]es to be Sync, i.e.,
@@ -23,7 +24,7 @@ impl ReplState {
         }
     }
 
-    fn run(&self, expr: Expr) {
-        self.state.lock().unwrap().run(&expr.expr)
+    fn run(&self, expr: Expr) -> Expr {
+        Expr::new(self.state.lock().unwrap().run(&expr.expr))
     }
 }
