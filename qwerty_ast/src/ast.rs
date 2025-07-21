@@ -1220,13 +1220,18 @@ pub enum Expr {
     /// ```ignore
     /// my_var
     /// ```
-    Variable { name: String, dbg: Option<DebugLoc> },
+    Variable {
+        name: String,
+        dbg: Option<DebugLoc>,
+    },
 
     /// A unit literal. Represents an empty register or void. Example syntax:
     /// ```ignore
     /// []
     /// ```
-    UnitLiteral { dbg: Option<DebugLoc> },
+    UnitLiteral {
+        dbg: Option<DebugLoc>,
+    },
 
     /// Takes the adjoint of a function value. Example syntax:
     /// ```ignore
@@ -1251,13 +1256,18 @@ pub enum Expr {
     /// ```ignore
     /// measure
     /// ```
-    Measure { basis: Basis, dbg: Option<DebugLoc> },
+    Measure {
+        basis: Basis,
+        dbg: Option<DebugLoc>,
+    },
 
     /// A function value that discards its input when called. Example syntax:
     /// ```ignore
     /// discard
     /// ```
-    Discard { dbg: Option<DebugLoc> },
+    Discard {
+        dbg: Option<DebugLoc>,
+    },
 
     /// A tensor product of function values or register values. Example syntax:
     /// ```ignore
@@ -1316,7 +1326,10 @@ pub enum Expr {
     /// ```ignore
     /// '0' + '1'
     /// ```
-    QLit { qlit: QLit, dbg: Option<DebugLoc> },
+    QLit {
+        qlit: QLit,
+        dbg: Option<DebugLoc>,
+    },
 
     /// A classical bit literal. Example syntax:
     /// ```ignore
@@ -1326,6 +1339,10 @@ pub enum Expr {
         dim: usize,
         bits: UBig,
         dbg: Option<DebugLoc>,
+    },
+
+    QubitRef {
+        index: usize,
     },
 }
 
@@ -1371,6 +1388,7 @@ impl fmt::Display for Expr {
             } => write!(f, "({}) if ({}) else ({})", then_expr, cond, else_expr),
             Expr::QLit { qlit, .. } => write!(f, "{}", qlit),
             Expr::BitLiteral { dim, bits, .. } => write!(f, "bit[{}](0b{:b})", dim, bits),
+            Expr::QubitRef { index } => write!(f, "q[{}]", index),
         }
     }
 }
