@@ -10,7 +10,7 @@
 
 #include "CCirc/IR/CCircOpsAttributes.cpp.inc"
 
-namespace qcirc {
+namespace ccirc {
 
 void CCircDialect::registerAttributes() {
     addAttributes<

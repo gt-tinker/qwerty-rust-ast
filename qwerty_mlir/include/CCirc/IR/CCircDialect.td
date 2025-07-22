@@ -15,11 +15,11 @@ include "mlir/IR/BuiltinTypes.td"
 
 def CCirc_Dialect : Dialect {
     let name = "qcirc";
-    let summary = "Dialect for quantum circuit operations";
+    let summary = "Dialect for classical circuits/logic";
     let description = [{
-        Low-level value-semantics gate dialect
+        Ops for a classical netlist containing typical gates such as NOT, XOR, AND, etc.
     }];
-    let cppNamespace = "::qcirc";
+    let cppNamespace = "::ccirc";
 
   let useDefaultTypePrinterParser = 1; // can change this to 0 later to change the type printer/parser
   let useDefaultAttributePrinterParser = 1;

@@ -6,16 +6,12 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 
-namespace qcirc {
+namespace ccirc {
 
 #define GEN_PASS_CLASSES
 #include "CCirc/Transforms/CCircPasses.h.inc"
 
-} // namespace qcirc
+} // namespace ccirc
 
 #endif // DIALECT_CCIRC_TRANSFORMS_PASSDETAIL_H_

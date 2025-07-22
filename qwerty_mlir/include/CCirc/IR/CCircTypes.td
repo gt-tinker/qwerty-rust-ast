@@ -11,7 +11,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 // class OperationType
 
 //===----------------------------------------------------------------------===//
-// Base qcirc type definition.
+// Base ccirc type definition.
 //===----------------------------------------------------------------------===//
 
 class CCirc_Type<string name, string typeMnemonic, list<Trait> traits = []> :

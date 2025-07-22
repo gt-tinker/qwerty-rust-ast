@@ -11,7 +11,7 @@
 #define GET_TYPEDEF_CLASSES
 #include "CCirc/IR/CCircOpsTypes.cpp.inc"
 
-namespace qcirc {
+namespace ccirc {
 
 void CCircDialect::registerTypes() {
     addTypes<
@@ -20,4 +20,4 @@ void CCircDialect::registerTypes() {
     >();
 }
 
-} // namespace qcirc
+} // namespace ccirc

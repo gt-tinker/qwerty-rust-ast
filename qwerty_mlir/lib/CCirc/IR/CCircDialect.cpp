@@ -34,12 +34,10 @@ struct CCircInlinerInterface : public mlir::DialectInlinerInterface {
     }
 };
 
-// Aggravating trick to create a llvm::ConstantArray in MLIR. See the
-// comment in CCircOps.td for LLVMConstantArrayOp.
 
 } // namespace
 
-namespace qcirc {
+namespace ccirc {
 
 void CCircDialect::initialize() {
     registerAttributes();
@@ -53,4 +51,4 @@ void CCircDialect::initialize() {
     addInterfaces<CCircInlinerInterface>();
 }
 
-} // namespace qcirc
+} // namespace ccirc

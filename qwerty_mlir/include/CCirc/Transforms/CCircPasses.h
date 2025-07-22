@@ -1,4 +1,4 @@
-//===- QcircPasses.h - Qcirc Patterns and Passes ------------*- C++ -*-===//
+//===- CcircPasses.h - Ccirc Patterns and Passes ------------*- C++ -*-===//
 //
 //===----------------------------------------------------------------------===//
 //
@@ -10,12 +10,8 @@
 #define DIALECT_INCLUDE_CCIRC_TRANSFORMS_CCIRC_TYPES_H
 
 #include "mlir/Pass/Pass.h"
-// include func::FuncOp definition for recursion to loop pass
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-// For lowering to LLVM
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 
-namespace qcirc {
+namespace ccirc {
 
 //===----------------------------------------------------------------------===//
 // Passes
@@ -29,6 +25,6 @@ namespace qcirc {
 #define GEN_PASS_REGISTRATION
 #include "CCirc/Transforms/CCircPasses.h.inc"
 
-} // namespace qcirc
+} // namespace ccirc
 
 #endif // DIALECT_INCLUDE_CCIRC_TRANSFORMS_CCIRC_TYPES_H
