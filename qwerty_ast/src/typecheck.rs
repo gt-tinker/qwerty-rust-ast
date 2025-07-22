@@ -520,7 +520,7 @@ impl Pipe {
                 Ok(((**in_out_ty).clone(), ComputeKind::Rev))
             }
 
-            Type::UnitType | Type::RegType { .. } => Err(TypeError {
+            Type::UnitType | Type::RegType { .. } | Type::TupleType { .. } => Err(TypeError {
                 kind: TypeErrorKind::NotCallable(rhs_ty.to_string()),
                 dbg: dbg.clone(),
             }),

@@ -2,7 +2,9 @@
 //! of evaluation are taken. The latter is based loosely on Appendix A of
 //! arXiv:2404.12603.
 
-use crate::ast::{Expr, QLit, Stmt, UnitLiteral, Adjoint, Predicated, Conditional, BitLiteral, Tensor, QubitRef};
+use crate::ast::{
+    Adjoint, BitLiteral, Conditional, Expr, Predicated, QLit, QubitRef, Stmt, Tensor, UnitLiteral,
+};
 use quantum_sparse_sim::QuantumSim;
 use std::collections::HashMap;
 

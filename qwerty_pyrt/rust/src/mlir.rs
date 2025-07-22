@@ -110,10 +110,10 @@ fn ast_ty_to_mlir_tys(ty: &ast::Type) -> Vec<ir::Type<'static>> {
             ..
         } => panic!("Basis has no MLIR type"),
 
+        ast::Type::TupleType { tys } => tys.iter().flat_map(ast_ty_to_mlir_tys).collect(),
+
         // Fallthrough for RegType where *dim == 0
         ast::Type::UnitType | ast::Type::RegType { .. } => vec![],
-        // TODO: Support TupleType once added to qwery_ast::ast::Type (that is
-        //       the reason why this returns a Vec)
     }
 }
 
@@ -566,6 +566,10 @@ fn synth_function_tensor_product(
                     ..
                 } => panic!("cannot take tensor product of function returning bases"),
                 ast::Type::UnitType | ast::Type::RegType { .. } => vec![], // dim == 0
+                // TODO: tensor args & results elementwise
+                ast::Type::TupleType { .. } => {
+                    panic!("cannot take tensor product of function taking tuples")
+                }
                 ast::Type::FuncType { .. } | ast::Type::RevFuncType { .. } => {
                     panic!("cannot take tensor product of function taking functions")
                 }
@@ -581,10 +585,16 @@ fn synth_function_tensor_product(
                         ast::Type::FuncType { .. } | ast::Type::RevFuncType { .. } => {
                             panic!("cannot take tensor product of functions taking functions")
                         }
+                        ast::Type::TupleType { .. } => {
+                            panic!("cannot take tensor product of functions taking tuples")
+                        }
                     }),
 
                     ast::Type::RegType { .. } => {
                         panic!("cannot tensor product registers and get a function")
+                    }
+                    ast::Type::TupleType { .. } => {
+                        panic!("cannot tensor product tuples and get a function")
                     }
                     ast::Type::UnitType => None,
                 }))
@@ -619,6 +629,9 @@ fn synth_function_tensor_product(
                             }
                             ast::Type::FuncType { .. } | ast::Type::RevFuncType { .. } => {
                                 panic!("cannot take tensor product of function taking functions")
+                            }
+                            ast::Type::TupleType { .. } => {
+                                panic!("cannot take tensor product of function taking tuples")
                             }
                         }]
                     };
@@ -665,6 +678,10 @@ fn synth_function_tensor_product(
                     ast::Type::FuncType { .. } | ast::Type::RevFuncType { .. } => {
                         panic!("cannot take tensor product of function taking functions")
                     }
+
+                    ast::Type::TupleType { .. } => {
+                        panic!("cannot take tensor product of function taking functions")
+                    }
                 })
                 .collect();
 
@@ -691,7 +708,10 @@ fn synth_function_tensor_product(
                 } => panic!("cannot take tensor product of function returning bases"),
                 ast::Type::UnitType | ast::Type::RegType { .. } => vec![],
                 ast::Type::FuncType { .. } | ast::Type::RevFuncType { .. } => {
-                    panic!("cannot take tensor product of function taking functions")
+                    panic!("cannot take tensor product of function returning functions")
+                }
+                ast::Type::TupleType { .. } => {
+                    panic!("cannot take tensor product of function returning tuples")
                 }
             }
         },
@@ -918,6 +938,7 @@ fn ast_expr_to_mlir(
                     elem_ty: RegKind::Basis,
                     ..
                 } => panic!("basis is not an expression"),
+                ast::Type::TupleType { .. } => panic!("cannot tensor tuples together"),
                 ast::Type::UnitType => vec![],
             };
             (ty, compute_kind, mlir_vals)
