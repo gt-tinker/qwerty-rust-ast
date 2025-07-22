@@ -5,7 +5,7 @@ from qwerty.repl import repl
 
 class ReplTests(unittest.TestCase):
     PROMPT = '(qwerty) '
-    
+
     def test_input_initial_eof(self):
         prompt_func = Mock(side_effect=[EOFError()])
         print_func = Mock()
