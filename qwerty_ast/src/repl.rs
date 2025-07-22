@@ -71,7 +71,9 @@ impl Expr {
     pub fn eval_step(&self, state: &mut ReplState) -> Option<Expr> {
         match self {
             Expr::QLit { qlit, .. } => match qlit {
-                QLit::ZeroQubit { .. } => Some(Expr::QubitRef { index: state.sim.allocate() }),
+                QLit::ZeroQubit { .. } => Some(Expr::QubitRef {
+                    index: state.sim.allocate(),
+                }),
                 _ => todo!("Rest of QLit"),
             },
             Expr::QubitRef { .. } => None,
