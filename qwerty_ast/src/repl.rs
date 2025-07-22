@@ -30,7 +30,7 @@ impl ReplState {
 
         // TODO: return the value resulting from evaluation instead of copying the input
         if let Stmt::Expr { expr, .. } = stmt {
-            expr.eval_to_value()
+            expr.eval_to_value(self)
         } else {
             Expr::UnitLiteral { dbg: None }
         }
@@ -68,10 +68,10 @@ impl Expr {
         }
     }
 
-    pub fn eval_step(&self) -> Option<Expr> {
+    pub fn eval_step(&self, state: &mut ReplState) -> Option<Expr> {
         match self {
             Expr::QLit { qlit, .. } => match qlit {
-                QLit::ZeroQubit { .. } => Some(Expr::QubitRef { index: 0 }),
+                QLit::ZeroQubit { .. } => Some(Expr::QubitRef { index: state.sim.allocate() }),
                 _ => todo!("Rest of QLit"),
             },
             Expr::QubitRef { .. } => None,
@@ -79,10 +79,10 @@ impl Expr {
         }
     }
 
-    pub fn eval_to_value(&self) -> Expr {
+    pub fn eval_to_value(&self, state: &mut ReplState) -> Expr {
         let mut expr = self.clone();
         loop {
-            match expr.eval_step() {
+            match expr.eval_step(state) {
                 Some(new_expr) => {
                     expr = new_expr;
                 }
