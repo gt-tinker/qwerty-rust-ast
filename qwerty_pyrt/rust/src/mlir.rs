@@ -238,8 +238,9 @@ where
 }
 
 /// Determines the primitive basis, eigenstate, and phase for a basis vector.
+/// The basis vector should be explicit (not contain any `'?'` or `'_'` atoms).
 /// Intended to be used only by `ast_vec_to_mlir()`, since it canonicalizes the
-/// vector and removes any outer tilt node.
+/// vector, removes any outer tilt node, and calls [`Vector::make_explicit`].
 fn ast_vec_to_mlir_helper(vec: &Vector) -> (qwerty::PrimitiveBasis, qwerty::Eigenstate, f64) {
     match vec {
         Vector::ZeroVector { .. } => (qwerty::PrimitiveBasis::Z, qwerty::Eigenstate::Plus, 0.0),
@@ -291,9 +292,9 @@ fn ast_vec_to_mlir_helper(vec: &Vector) -> (qwerty::PrimitiveBasis, qwerty::Eige
             _ => todo!("nontrivial superposition"),
         },
 
-        // TODO: this function should operate on explicit vectors. other
-        //       code can handle shuffling for ? and _
-        Vector::PadVector { .. } | Vector::TargetVector { .. } => todo!("'?' and '_' lowering"),
+        Vector::PadVector { .. } | Vector::TargetVector { .. } => {
+            unreachable!("'?' and '_' atoms should be removed earlier")
+        }
 
         Vector::VectorTilt { .. } => {
             unreachable!("Outer tilt should be removed by ast_vec_to_mlir()")
