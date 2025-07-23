@@ -1,4 +1,4 @@
-use dashu::integer::UBig;
+use dashu::{base::BitTest, integer::UBig};
 use melior::{
     dialect::{arith, qcirc, qwerty, scf, DialectHandle, DialectRegistry},
     execution_engine::SymbolFlags,
@@ -20,8 +20,8 @@ use melior::{
 use qwerty_ast::{
     ast::{
         self, angle_is_approx_zero, angles_are_approx_equal, Assign, Basis, BasisTranslation,
-        Conditional, Discard, Expr, FunctionDef, Measure, Pipe, Program, QLit, RegKind, Return,
-        Stmt, Tensor, UnpackAssign, Variable, Vector, VectorAtomKind,
+        BitLiteral, Conditional, Discard, Expr, FunctionDef, Measure, Pipe, Program, QLit, RegKind,
+        Return, Stmt, Tensor, UnpackAssign, Variable, Vector, VectorAtomKind,
     },
     dbg::DebugLoc,
     typecheck::{ComputeKind, TypeEnv},
@@ -1228,6 +1228,37 @@ fn ast_expr_to_mlir(
                 .expect("Qubit literal to pass type checking");
             let vals = ast_qlit_to_mlir(qlit, block).into_iter().collect();
             (ty, compute_kind, vals)
+        }
+
+        Expr::BitLiteral(blit @ BitLiteral { dim, bits, dbg }) => {
+            let loc = dbg_to_loc(dbg.clone());
+            let mlir_vals = vec![mlir_wrap_calc(block, loc, |calc_block| {
+                let bit_vals: Vec<_> = (0..*dim)
+                    .rev()
+                    .map(|idx| {
+                        let bit = bits.bit(idx) as i64;
+                        calc_block
+                            .append_operation(arith::constant(
+                                &MLIR_CTX,
+                                IntegerAttribute::new(IntegerType::new(&MLIR_CTX, 1).into(), bit)
+                                    .into(),
+                                loc,
+                            ))
+                            .result(0)
+                            .unwrap()
+                            .into()
+                    })
+                    .collect();
+
+                calc_block
+                    .append_operation(qwerty::bitpack(&bit_vals, loc))
+                    .result(0)
+                    .unwrap()
+                    .into()
+            })];
+
+            let (ty, compute_kind) = blit.calc_type().expect("bit literal to pass typechecking");
+            (ty, compute_kind, mlir_vals)
         }
 
         _ => todo!("expression {}", expr),
