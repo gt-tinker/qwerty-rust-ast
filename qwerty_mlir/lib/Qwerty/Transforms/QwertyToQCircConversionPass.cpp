@@ -2470,7 +2470,7 @@ void standardizeCompressed(mlir::RewriterBase &rewriter,
             controls.push_back(qubits[ctrl_idx]);
             controls.append(control_qubits.begin(), control_qubits.end());
             gate = rewriter.create<qcirc::Gate1QOp>(
-                loc, kind, control_qubits, qubits[idx]);
+                loc, kind, controls, qubits[idx]);
         } else {
             gate = rewriter.create<qcirc::Gate1QOp>(
                 loc, kind, control_qubits, qubits[idx]);
@@ -2506,11 +2506,13 @@ void standardizeCompressed(mlir::RewriterBase &rewriter,
         } else if (stdize.prim_basis == qwerty::PrimitiveBasis::BELL) {
             assert(dim == 2 && "I only know the Bell basis on two qubits");
             if (left) {
-                one_qubit_gate(qcirc::Gate1Q::X, 0, 1);
-                one_qubit_gate(qcirc::Gate1Q::H, -1, 0);
+                one_qubit_gate(qcirc::Gate1Q::X, 1, 0);
+                one_qubit_gate(qcirc::Gate1Q::H, -1, 1);
+                one_qubit_gate(qcirc::Gate1Q::Z, 1, 0);
             } else { // right
-                one_qubit_gate(qcirc::Gate1Q::H, -1, 0);
-                one_qubit_gate(qcirc::Gate1Q::X, 0, 1);
+                one_qubit_gate(qcirc::Gate1Q::Z, 1, 0);
+                one_qubit_gate(qcirc::Gate1Q::H, -1, 1);
+                one_qubit_gate(qcirc::Gate1Q::X, 1, 0);
             }
         } else {
             for (size_t i = qubit_idx; i < qubit_idx + dim; i++) {

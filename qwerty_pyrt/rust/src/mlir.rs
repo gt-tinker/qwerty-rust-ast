@@ -8,12 +8,12 @@ use melior::{
             FlatSymbolRefAttribute, FloatAttribute, IntegerAttribute, StringAttribute,
             TypeAttribute,
         },
-        operation::OperationResult,
+        operation::{OperationPrintingFlags, OperationResult},
         r#type::{FunctionType, IntegerType},
         Block, BlockLike, Location, Module, Operation, OperationLike, Region, RegionLike, Type,
         TypeLike, Value, ValueLike,
     },
-    pass::{transform, PassManager},
+    pass::{transform, PassIrPrintingOptions, PassManager},
     utility::register_inliner_extensions,
     Context, Error, ExecutionEngine,
 };
@@ -26,7 +26,7 @@ use qwerty_ast::{
     dbg::DebugLoc,
     typecheck::{ComputeKind, TypeEnv},
 };
-use std::{collections::HashMap, sync::LazyLock};
+use std::{collections::HashMap, env, sync::LazyLock};
 
 /// Holds the MLIR context in static memory, initializing it on first use.
 static MLIR_CTX: LazyLock<Context> = LazyLock::new(|| {
@@ -377,6 +377,125 @@ struct MlirBasis {
     tgt_indices: Vec<usize>,
 }
 
+fn is_bell_basis(vecs: &[Vector]) -> bool {
+    let answer = if let [Vector::UniformVectorSuperpos {
+        q1: q11, q2: q12, ..
+    }, Vector::UniformVectorSuperpos {
+        q1: q21, q2: q22, ..
+    }, Vector::UniformVectorSuperpos {
+        q1: q31, q2: q32, ..
+    }, Vector::UniformVectorSuperpos {
+        q1: q41, q2: q42, ..
+    }] = vecs
+    {
+        let q11_is_00 = if let Vector::VectorTensor { qs: vecs11, .. } = &**q11 {
+            matches!(
+                &vecs11[..],
+                [Vector::ZeroVector { .. }, Vector::ZeroVector { .. }]
+            )
+        } else {
+            false
+        };
+        let q12_is_11 = if let Vector::VectorTensor { qs: vecs12, .. } = &**q12 {
+            matches!(
+                &vecs12[..],
+                [Vector::OneVector { .. }, Vector::OneVector { .. }]
+            )
+        } else {
+            false
+        };
+
+        let q21_is_neg_11 = if let Vector::VectorTilt {
+            q: q21q,
+            angle_deg: q21_angle_deg,
+            ..
+        } = &**q21
+        {
+            if angles_are_approx_equal(*q21_angle_deg, 180.0) {
+                if let Vector::VectorTensor { qs: vecs22, .. } = &**q21q {
+                    matches!(
+                        &vecs22[..],
+                        [Vector::OneVector { .. }, Vector::OneVector { .. }]
+                    )
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        let q22_is_00 = if let Vector::VectorTensor { qs: vecs21, .. } = &**q22 {
+            matches!(
+                &vecs21[..],
+                [Vector::ZeroVector { .. }, Vector::ZeroVector { .. }]
+            )
+        } else {
+            false
+        };
+
+        let q31_is_01 = if let Vector::VectorTensor { qs: vecs32, .. } = &**q31 {
+            matches!(
+                &vecs32[..],
+                [Vector::ZeroVector { .. }, Vector::OneVector { .. }]
+            )
+        } else {
+            false
+        };
+        let q32_is_10 = if let Vector::VectorTensor { qs: vecs31, .. } = &**q32 {
+            matches!(
+                &vecs31[..],
+                [Vector::OneVector { .. }, Vector::ZeroVector { .. }]
+            )
+        } else {
+            false
+        };
+
+        let q41_is_neg_10 = if let Vector::VectorTilt {
+            q: q41q,
+            angle_deg: q41_angle_deg,
+            ..
+        } = &**q41
+        {
+            if angles_are_approx_equal(*q41_angle_deg, 180.0) {
+                if let Vector::VectorTensor { qs: vecs42, .. } = &**q41q {
+                    matches!(
+                        &vecs42[..],
+                        [Vector::OneVector { .. }, Vector::ZeroVector { .. }]
+                    )
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        let q42_is_01 = if let Vector::VectorTensor { qs: vecs41, .. } = &**q42 {
+            matches!(
+                &vecs41[..],
+                [Vector::ZeroVector { .. }, Vector::OneVector { .. }]
+            )
+        } else {
+            false
+        };
+
+        q11_is_00
+            && q12_is_11
+            && q21_is_neg_11
+            && q22_is_00
+            && q31_is_01
+            && q32_is_10
+            && q41_is_neg_10
+            && q42_is_01
+    } else {
+        false
+    };
+    answer
+}
+
 /// Converts a Basis AST node into a qwerty::BasisAttribute and a separate list
 /// of phases which correspond one-to-one with any vectors that have
 /// hasPhase==true.
@@ -387,6 +506,11 @@ fn ast_basis_to_mlir(basis: &Basis) -> MlirBasis {
         .iter()
         .map(|elem| {
             match elem {
+                Basis::BasisLiteral { vecs, .. } if is_bell_basis(vecs) => {
+                    let std = qwerty::BuiltinBasisAttribute::new(&MLIR_CTX, qwerty::PrimitiveBasis::Bell, 2);
+                    (qwerty::BasisElemAttribute::from_std(&MLIR_CTX, std), vec![])
+                }
+
                 Basis::BasisLiteral { vecs, .. } => {
                     let (vec_attrs, phases): (Vec<_>, Vec<_>) = vecs.iter().map(|vec| {
                         let (vec_attrs, phase) = ast_vec_to_mlir(vec);
@@ -1445,78 +1569,72 @@ struct RunPassesConfig {
 }
 
 fn run_passes(module: &mut Module, cfg: RunPassesConfig) -> Result<(), Error> {
+    let pm = PassManager::new(&MLIR_CTX);
     if cfg.dump {
-        eprintln!("Qwerty-dialect IR:");
-        module.as_operation().dump();
+        let dump_dir = env::current_dir().unwrap().join("mlir-dumps");
+        eprintln!(
+            "MLIR files will be dumped to directory `{}`",
+            dump_dir.display()
+        );
+        pm.enable_ir_printing(&PassIrPrintingOptions {
+            before_all: true,
+            after_all: true,
+            module_scope: false,
+            on_change: false,
+            on_failure: false,
+            flags: OperationPrintingFlags::new(),
+            tree_printing_path: dump_dir,
+        });
     }
 
-    {
-        let pm = PassManager::new(&MLIR_CTX);
+    // Stage 1: Optimize Qwerty dialect
 
-        // Stage 1: Optimize Qwerty dialect
+    // Running the canonicalizer may introduce lambdas, so run it once first
+    // before the lambda lifter
+    pm.add_pass(transform::create_canonicalizer());
+    pm.add_pass(qwerty::create_lift_lambdas());
+    // Will turn qwerty.call_indirects into qwerty.calls
+    pm.add_pass(transform::create_canonicalizer());
+    pm.add_pass(transform::create_inliner());
+    // It seems the inliner may not run a final round of canonicalization
+    // sometimes, so do it ourselves
+    pm.add_pass(transform::create_canonicalizer());
+    // Remove any leftover symbols
+    pm.add_pass(transform::create_symbol_dce());
 
-        // Running the canonicalizer may introduce lambdas, so run it once first
-        // before the lambda lifter
-        pm.add_pass(transform::create_canonicalizer());
-        pm.add_pass(qwerty::create_lift_lambdas());
-        // Will turn qwerty.call_indirects into qwerty.calls
-        pm.add_pass(transform::create_canonicalizer());
-        pm.add_pass(transform::create_inliner());
-        // It seems the inliner may not run a final round of canonicalization
-        // sometimes, so do it ourselves
-        pm.add_pass(transform::create_canonicalizer());
-        // Remove any leftover symbols
-        pm.add_pass(transform::create_symbol_dce());
+    // Stage 2: Convert to QCirc dialect
 
-        // Stage 2: Convert to QCirc dialect
+    // -only-pred-ones will introduce some lambdas, so lift and inline them too
+    pm.add_pass(qwerty::create_only_pred_ones());
+    pm.add_pass(qwerty::create_lift_lambdas());
+    // Will turn qwerty.call_indirects into qwerty.calls
+    pm.add_pass(transform::create_canonicalizer());
+    pm.add_pass(transform::create_inliner());
+    pm.add_pass(qwerty::create_qwerty_to_q_circ_conversion());
+    // Add canonicalizer pass to prune unused "builtin.unrealized_conversion_cast" ops
+    pm.add_pass(transform::create_canonicalizer());
 
-        // -only-pred-ones will introduce some lambdas, so lift and inline them too
-        pm.add_pass(qwerty::create_only_pred_ones());
-        pm.add_pass(qwerty::create_lift_lambdas());
-        // Will turn qwerty.call_indirects into qwerty.calls
-        pm.add_pass(transform::create_canonicalizer());
-        pm.add_pass(transform::create_inliner());
-        pm.add_pass(qwerty::create_qwerty_to_q_circ_conversion());
-        // Add canonicalizer pass to prune unused "builtin.unrealized_conversion_cast" ops
-        pm.add_pass(transform::create_canonicalizer());
-        pm.run(module)?;
-    }
+    // Stage 3: Optimize QCirc dialect
 
-    if cfg.dump {
-        eprintln!("QCirc-dialect IR:");
-        module.as_operation().dump();
-    }
-
-    {
-        let pm = PassManager::new(&MLIR_CTX);
-
-        // Stage 3: Optimize QCirc dialect
-
-        let func_pm = pm.nested_under("func.func");
+    let func_pm = pm.nested_under("func.func");
+    func_pm.add_pass(qcirc::create_peephole_optimization());
+    if cfg.decompose_multi_ctrl {
+        func_pm.add_pass(qcirc::create_decompose_multi_control());
         func_pm.add_pass(qcirc::create_peephole_optimization());
-        if cfg.decompose_multi_ctrl {
-            func_pm.add_pass(qcirc::create_decompose_multi_control());
-            func_pm.add_pass(qcirc::create_peephole_optimization());
-            func_pm.add_pass(qcirc::create_replace_non_qasm_gates());
-        }
-
-        // Stage 4: Convert to QIR
-        pm.add_pass(qcirc::create_replace_non_qir_gates());
-        if cfg.to_base_profile {
-            pm.add_pass(qcirc::create_base_profile_module_prep());
-            let func_pm = pm.nested_under("func.func");
-            func_pm.add_pass(qcirc::create_base_profile_func_prep());
-        }
-        pm.add_pass(qcirc::create_q_circ_to_qir_conversion());
-        pm.add_pass(transform::create_canonicalizer());
-
-        pm.run(module)?;
+        func_pm.add_pass(qcirc::create_replace_non_qasm_gates());
     }
 
-    if cfg.dump {
-        eprintln!("LLVM-dialect IR:");
-        module.as_operation().dump();
+    // Stage 4: Convert to QIR
+    pm.add_pass(qcirc::create_replace_non_qir_gates());
+    if cfg.to_base_profile {
+        pm.add_pass(qcirc::create_base_profile_module_prep());
+        let func_pm = pm.nested_under("func.func");
+        func_pm.add_pass(qcirc::create_base_profile_func_prep());
     }
+    pm.add_pass(qcirc::create_q_circ_to_qir_conversion());
+    pm.add_pass(transform::create_canonicalizer());
+
+    pm.run(module)?;
 
     Ok(())
 }
@@ -1537,14 +1655,14 @@ macro_rules! qir_symbol {
     };
 }
 
-pub fn run_ast(prog: &Program, func_name: &str, num_shots: usize) -> Vec<ShotResult> {
+pub fn run_ast(prog: &Program, func_name: &str, num_shots: usize, debug: bool) -> Vec<ShotResult> {
     assert_ne!(num_shots, 0);
 
     let mut module = ast_program_to_mlir(prog);
     let cfg = RunPassesConfig {
         decompose_multi_ctrl: false,
         to_base_profile: false,
-        dump: false,
+        dump: debug,
     };
     run_passes(&mut module, cfg).unwrap();
 

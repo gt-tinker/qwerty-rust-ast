@@ -224,7 +224,6 @@ impl fmt::Display for VectorAtomKind {
     }
 }
 
-//#[derive(Debug, Clone, PartialOrd, PartialEq, Eq)]
 #[derive(Debug, Clone)]
 pub enum Vector {
     ZeroVector {

@@ -53,9 +53,13 @@ class IntegrationTests(unittest.TestCase):
         expected_histo = {bit[3](0b110): shots}
         self.assertEqual(expected_histo, pad_nometa.test(shots))
 
-    @unittest.skip('Superdense coding still WIP')
     def test_superdense_nocap(self):
         from .integ import superdense_nocap
         shots = 1024
-        expected_histo = {bit[2](0b00): shots}
-        self.assertEqual(expected_histo, superdense_nocap.test(shots))
+        expected_histos = (
+            {bit[2](0b00): shots},
+            {bit[2](0b01): shots},
+            {bit[2](0b10): shots},
+            {bit[2](0b11): shots},
+        )
+        self.assertEqual(expected_histos, superdense_nocap.test(shots))

@@ -702,10 +702,11 @@ impl Program {
         py: Python<'py>,
         func_name: String,
         num_shots: usize,
+        debug: bool,
     ) -> PyResult<Vec<(Bound<'py, PyAny>, usize)>> {
         self.type_check(py)?;
 
-        run_ast(&self.program, &func_name, num_shots)
+        run_ast(&self.program, &func_name, num_shots, debug)
             .into_iter()
             .map(|shot_result| {
                 let as_int = UBigWrap(shot_result.bits).into_pyobject(py)?;
