@@ -2146,23 +2146,45 @@ void determineUnconditional(llvm::SmallVectorImpl<Standardization> &left_stdize,
             } else if (lstdize->end == rstdize->end) {
                 // End at the same point, and at least one is a fourier[N], but
                 // they aren't the same
+                //            left_stdize_idx
+                //                 v
                 //    ... +  std + pm  + ...
                 // >> ... + fourier[2] + ...
+                //          ^
+                //        right_stdize_idx
                 lstdize->unconditional = false;
                 rstdize->unconditional = false;
                 left_stdize_idx++;
                 right_stdize_idx++;
             } else if (lstdize->prim_basis == qwerty::PrimitiveBasis::FOURIER
                        && rstdize->end < lstdize->end) {
+                //     left_stdize_idx
+                //          v
+                //    ... + fourier[2] + ...
+                // >> ... +  std + pm  + ...
+                //           ^
+                //         right_stdize_idx
                 rstdize->unconditional = false;
                 right_stdize_idx++;
             } else if (rstdize->prim_basis == qwerty::PrimitiveBasis::FOURIER
                        && lstdize->end < rstdize->end) {
+                //      left_stdize_idx
+                //           v
+                //    ... +  std + pm  + ...
+                // >> ... + fourier[2] + ...
+                //          ^
+                //        right_stdize_idx
                 rstdize->unconditional = false;
                 left_stdize_idx++;
             } else if (lstdize->prim_basis != qwerty::PrimitiveBasis::FOURIER
                        // && rstdize->prim_basis == qwerty::PrimitiveBasis::FOURIER
                        && rstdize->end < lstdize->end) {
+                //      left_stdize_idx
+                //           v
+                //    ... +  std[3]    + ...
+                // >> ... + fourier[2] + ...
+                //          ^
+                //        right_stdize_idx
                 Standardization remainder = lstdize->split(rstdize->end);
                 left_stdize.insert(left_stdize.begin()+left_stdize_idx+1, remainder);
                 // That may have resized the backing array of left_stdize, so we
@@ -2176,6 +2198,12 @@ void determineUnconditional(llvm::SmallVectorImpl<Standardization> &left_stdize,
             } else if (rstdize->prim_basis != qwerty::PrimitiveBasis::FOURIER
                        // && lstdize->prim_basis == qwerty::PrimitiveBasis::FOURIER
                        && lstdize->end < rstdize->end) {
+                //     left_stdize_idx
+                //          v
+                //    ... + fourier[2] + ...
+                // >> ... +  std[3]    + ...
+                //           ^
+                //         right_stdize_idx
                 Standardization remainder = rstdize->split(lstdize->end);
                 right_stdize.insert(right_stdize.begin()+right_stdize_idx+1, remainder);
                 // That may have resized the backing array of right_stdize, so we
@@ -2457,13 +2485,28 @@ void standardizeCompressed(mlir::RewriterBase &rewriter,
                            // This is a "compacted" list produced by
                            // compactStandardizedQubits()
                            llvm::SmallVectorImpl<mlir::Value> &qubits) {
-    auto one_qubit_gate = [&](qcirc::Gate1Q kind, size_t idx) {
-        qcirc::Gate1QOp gate = rewriter.create<qcirc::Gate1QOp>(
-            loc, kind, control_qubits, qubits[idx]);
+    auto one_qubit_gate = [&](qcirc::Gate1Q kind, ssize_t ctrl_idx, size_t idx) {
+        qcirc::Gate1QOp gate;
+        if (ctrl_idx >= 0) {
+            llvm::SmallVector<mlir::Value> controls;
+            controls.push_back(qubits[ctrl_idx]);
+            controls.append(control_qubits.begin(), control_qubits.end();
+            gate = rewriter.create<qcirc::Gate1QOp>(
+                loc, kind, control_qubits, qubits[idx]);
+        } else {
+            gate = rewriter.create<qcirc::Gate1QOp>(
+                loc, kind, control_qubits, qubits[idx]);
+        }
         qubits[idx] = gate.getResult();
         control_qubits.clear();
-        control_qubits.append(gate.getControlResults().begin(),
-                              gate.getControlResults().end());
+        if (ctrl_idx >= 0) {
+            qubits[ctrl_idx] = gate.getControlResults()[0];
+            control_qubits.append(gate.getControlResults().begin()+1,
+                                  gate.getControlResults().end());
+        } else {
+            control_qubits.append(gate.getControlResults().begin(),
+                                  gate.getControlResults().end());
+        }
     };
 
     size_t qubit_idx = 0;
@@ -2482,19 +2525,28 @@ void standardizeCompressed(mlir::RewriterBase &rewriter,
                 runQft(loc, rewriter, control_qubits,
                        qubits, qubit_idx, dim);
             }
+        } else if (stdize.prim_basis == qwerty::PrimitiveBasis::BELL) {
+            assert(dim == 2 && "I only know the Bell basis on two qubits");
+            if (left) {
+                one_qubit_gate(qcirc::Gate1Q::X, 0, 1);
+                one_qubit_gate(qcirc::Gate1Q::H, -1, 0);
+            } else { // right
+                one_qubit_gate(qcirc::Gate1Q::H, -1, 0);
+                one_qubit_gate(qcirc::Gate1Q::X, 0, 1);
+            }
         } else {
             for (size_t i = qubit_idx; i < qubit_idx + dim; i++) {
                 switch (stdize.prim_basis) {
                 case qwerty::PrimitiveBasis::X:
-                    one_qubit_gate(qcirc::Gate1Q::H, i);
+                    one_qubit_gate(qcirc::Gate1Q::H, -1, i);
                     break;
                 case qwerty::PrimitiveBasis::Y:
                     if (left) {
-                        one_qubit_gate(qcirc::Gate1Q::Sdg, i);
-                        one_qubit_gate(qcirc::Gate1Q::H, i);
+                        one_qubit_gate(qcirc::Gate1Q::Sdg, -1, i);
+                        one_qubit_gate(qcirc::Gate1Q::H, -1, i);
                     } else { // right
-                        one_qubit_gate(qcirc::Gate1Q::H, i);
-                        one_qubit_gate(qcirc::Gate1Q::S, i);
+                        one_qubit_gate(qcirc::Gate1Q::H, -1, i);
+                        one_qubit_gate(qcirc::Gate1Q::S, -1, i);
                     }
                     break;
                 default:
