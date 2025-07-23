@@ -289,7 +289,7 @@ fn ast_vec_to_mlir_helper(vec: &Vector) -> (qwerty::PrimitiveBasis, qwerty::Eige
                     std::f64::consts::PI,
                 )
             }
-            _ => todo!("nontrivial superposition"),
+            _ => todo!("nontrivial superposition {vec}"),
         },
 
         Vector::PadVector { .. } | Vector::TargetVector { .. } => {

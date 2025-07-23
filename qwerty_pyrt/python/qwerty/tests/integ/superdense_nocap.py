@@ -7,14 +7,17 @@ from qwerty import *
 
 @qpu
 def kernel00() -> bit[2]:
+    payload = bit[2](0b00)
+    bit0, bit1 = payload
+
     alice, bob = '00' + '11'
 
     id = '?' >> '?'
     sent_to_bob = (
         alice | ({'0'>>'1', '1'>>'0'}
-                 if bit[1](0b0) else id)
+                 if bit0 else id)
               | ('1' >> -'1'
-                 if bit[1](0b0) else id))
+                 if bit1 else id))
 
     return (sent_to_bob * bob
             | __MEASURE__(
