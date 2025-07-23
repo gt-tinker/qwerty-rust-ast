@@ -14,7 +14,7 @@ include "mlir/IR/BuiltinTypes.td"
 //===----------------------------------------------------------------------===//
 
 def CCirc_Dialect : Dialect {
-    let name = "qcirc";
+    let name = "ccirc";
     let summary = "Dialect for classical circuits/logic";
     let description = [{
         Ops for a classical netlist containing typical gates such as NOT, XOR, AND, etc.

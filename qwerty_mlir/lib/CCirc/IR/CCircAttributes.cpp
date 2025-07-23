@@ -18,4 +18,4 @@ void CCircDialect::registerAttributes() {
     >();
 }
 
-} // namespace qcirc
+} // namespace ccirc

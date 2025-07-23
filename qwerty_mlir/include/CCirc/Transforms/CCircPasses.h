@@ -2,7 +2,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This header declares patterns and passes on MemRef operations.
+// This header declares patterns and passes on ccirc operations.
 //
 //===----------------------------------------------------------------------===//
 
