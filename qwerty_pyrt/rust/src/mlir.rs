@@ -1,6 +1,6 @@
 use dashu::integer::UBig;
 use melior::{
-    dialect::{arith, qcirc, qwerty, DialectHandle, DialectRegistry},
+    dialect::{arith, qcirc, qwerty, scf, DialectHandle, DialectRegistry},
     execution_engine::SymbolFlags,
     ir::{
         self,
@@ -20,8 +20,8 @@ use melior::{
 use qwerty_ast::{
     ast::{
         self, angle_is_approx_zero, angles_are_approx_equal, Assign, Basis, BasisTranslation,
-        Discard, Expr, FunctionDef, Measure, Pipe, Program, QLit, RegKind, Return, Stmt, Tensor,
-        UnpackAssign, Variable, Vector, VectorAtomKind,
+        Conditional, Discard, Expr, FunctionDef, Measure, Pipe, Program, QLit, RegKind, Return,
+        Stmt, Tensor, UnpackAssign, Variable, Vector, VectorAtomKind,
     },
     dbg::DebugLoc,
     typecheck::{ComputeKind, TypeEnv},
@@ -1158,6 +1158,68 @@ fn ast_expr_to_mlir(
                 },
             )];
             (ty, compute_kind, lambda)
+        }
+
+        Expr::Conditional(
+            conditional @ Conditional {
+                then_expr,
+                else_expr,
+                cond,
+                dbg,
+            },
+        ) => {
+            let loc = dbg_to_loc(dbg.clone());
+
+            let (cond_ty, cond_compute_kind, cond_vals) = ast_expr_to_mlir(cond, ctx, block);
+            assert_eq!(cond_vals.len(), 1);
+            let cond_bitbundle = cond_vals[0];
+
+            let cond_i1 = block
+                .append_operation(qwerty::bitunpack(cond_bitbundle, loc))
+                .result(0)
+                .unwrap()
+                .into();
+
+            let then_block_args = &[];
+            let then_block = Block::new(then_block_args);
+            let (then_ty, then_compute_kind, then_vals) =
+                ast_expr_to_mlir(then_expr, ctx, &then_block);
+            then_block.append_operation(scf::r#yield(&then_vals, loc));
+
+            let then_region = Region::new();
+            then_region.append_block(then_block);
+
+            let else_block_args = &[];
+            let else_block = Block::new(else_block_args);
+            let (else_ty, else_compute_kind, else_vals) =
+                ast_expr_to_mlir(else_expr, ctx, &else_block);
+            else_block.append_operation(scf::r#yield(&else_vals, loc));
+
+            let else_region = Region::new();
+            else_region.append_block(else_block);
+
+            let (ty, compute_kind) = conditional
+                .calc_type(
+                    &(then_ty, then_compute_kind),
+                    &(else_ty, else_compute_kind),
+                    &(cond_ty, cond_compute_kind),
+                )
+                .expect("Conditional to pass typechecking");
+            let result_mlir_tys = ast_ty_to_mlir_tys(&ty);
+
+            let mlir_vals: Vec<_> = block
+                .append_operation(scf::r#if(
+                    cond_i1,
+                    &result_mlir_tys,
+                    then_region,
+                    else_region,
+                    loc,
+                ))
+                .results()
+                .map(OperationResult::into)
+                .collect();
+
+            (ty, compute_kind, mlir_vals)
         }
 
         Expr::QLit(qlit) => {
