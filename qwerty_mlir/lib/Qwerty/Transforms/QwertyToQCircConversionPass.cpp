@@ -2093,6 +2093,10 @@ struct Standardization {
     Standardization(qwerty::PrimitiveBasis prim_basis, size_t start, size_t end, bool unconditional)
                : prim_basis(prim_basis), start(start), end(end), unconditional(unconditional) {}
 
+    static Standardization new_padding(size_t start, size_t end) {
+        return Standardization((qwerty::PrimitiveBasis)-1, start, end);
+    }
+
     bool operator==(const Standardization &stdize) const {
         return prim_basis == stdize.prim_basis && stdize.start == start && stdize.end == end;
     }
@@ -2224,9 +2228,8 @@ void determineUnconditional(llvm::SmallVectorImpl<Standardization> &left_stdize,
                     big_stdize.emplace_back(big.prim_basis, pos, pos + big_dim,
                                             /*unconditional=*/false);
                 }
-                big_queue.push_front(Standardization(
-                    (qwerty::PrimitiveBasis)-1, pos + small_dim,
-                    pos + big_dim));
+                big_queue.push_front(Standardization::new_padding(
+                    pos + small_dim, pos + big_dim));
             }
             pos += small_dim;
         }
