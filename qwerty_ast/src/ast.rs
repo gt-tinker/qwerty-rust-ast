@@ -1339,13 +1339,13 @@ pub enum Expr {
     /// ```text
     /// my_var
     /// ```
-    Variable(Variable),
+    Variable { name: String, dbg: Option<DebugLoc> },
 
     /// A unit literal. Represents an empty register or void. Example syntax:
     /// ```text
     /// []
     /// ```
-    UnitLiteral(UnitLiteral),
+    UnitLiteral { dbg: Option<DebugLoc> },
 
     /// Takes the adjoint of a function value. Example syntax:
     /// ```text
@@ -1363,13 +1363,13 @@ pub enum Expr {
     /// ```text
     /// measure
     /// ```
-    Measure(Measure),
+    Measure { basis: Basis, dbg: Option<DebugLoc> },
 
     /// A function value that discards its input when called. Example syntax:
     /// ```text
     /// discard
     /// ```
-    Discard(Discard),
+    Discard { dbg: Option<DebugLoc> },
 
     /// A tensor product of function values or register values. Example syntax:
     /// ```text
@@ -1408,7 +1408,7 @@ pub enum Expr {
     /// ```text
     /// '0' + '1'
     /// ```
-    QLit(QLit),
+    QLit { qlit: QLit, dbg: Option<DebugLoc> },
 
     /// A classical bit literal. Example syntax:
     /// ```text
@@ -1421,7 +1421,7 @@ pub enum Expr {
     /// syntax that can (directly) produce this node. However, we implement the
     /// Display string as `q[i]`, although programmers should never see this
     /// node printed.
-    QubitRef(QubitRef),
+    QubitRef { index: usize },
 }
 
 impl fmt::Display for Expr {

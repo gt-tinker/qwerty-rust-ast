@@ -66,11 +66,60 @@ impl Expr {
 
     pub fn eval_step(&self, state: &mut ReplState) -> Option<Expr> {
         match self {
-            Expr::QLit(qlit) => match qlit {
-                QLit::ZeroQubit { .. } => Some(Expr::QubitRef(QubitRef {
-                    index: state.sim.allocate(),
-                })),
-                _ => todo!("Rest of QLit"),
+            Expr::QLit { qlit, .. } => match qlit {
+                QLit::ZeroQubit { .. } => {
+                    let q = state.sim.allocate();
+                    Some(Expr::QubitRef { index: q })
+                }
+                QLit::OneQubit { .. } => {
+                    let q = state.sim.allocate();
+                    state.sim.x(q); // use x to flip 0 to 1
+                    Some(Expr::QubitRef { index: q })
+                }
+                QLit::QubitTilt { q, angle_deg, dbg } => {
+                    let inside_expr = Expr::QLit {
+                        qlit: *q.clone(),
+                        dbg: dbg.clone(),
+                    }; // recursion for nest
+                    if let Some(Expr::QubitRef { index }) = inside_expr.eval_step(state) {
+                        state.sim.rz(*angle_deg, index); // tilt using spacesim
+                        Some(Expr::QubitRef { index })
+                    } else {
+                        None // evaluation failed
+                    }
+                }
+                QLit::UniformSuperpos { q1, q2, dbg } => {
+                    let inside_expr = Expr::QLit {
+                        qlit: *q1.clone(),
+                        dbg: dbg.clone(),
+                    };
+                    if let Some(Expr::QubitRef { index }) = inside_expr.eval_step(state) {
+                        state.sim.h(index);
+                        Some(Expr::QubitRef { index })
+                    } else {
+                        None
+                    }
+                }
+                // qs is a vector, so parse through vector and then evaluate
+                QLit::QubitTensor { qs, dbg } => {
+                    let mut vals = Vec::new();
+                    for qlit in qs {
+                        let inner_expr = Expr::QLit {
+                            qlit: qlit.clone(),
+                            dbg: dbg.clone(),
+                        };
+                        if let Some(Expr::QubitRef { index }) = inner_expr.eval_step(state) {
+                            vals.push(Expr::QubitRef { index });
+                        } else {
+                            return None;
+                        }
+                    }
+                    Some(Expr::Tensor {
+                        vals,
+                        dbg: dbg.clone(),
+                    })
+                }
+                QLit::QubitUnit { dbg, .. } => Some(Expr::UnitLiteral { dbg: dbg.clone() }),
             },
             Expr::QubitRef { .. } => None,
             _ => todo!("eval_step()"),
