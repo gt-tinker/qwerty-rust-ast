@@ -377,8 +377,10 @@ struct MlirBasis {
     tgt_indices: Vec<usize>,
 }
 
+/// Determines if a basis literal containing vectors `vecs` represents the Bell
+/// basis. This is a hard-coded hack that should be removed in the future.
 fn is_bell_basis(vecs: &[Vector]) -> bool {
-    let answer = if let [Vector::UniformVectorSuperpos {
+    if let [Vector::UniformVectorSuperpos {
         q1: q11, q2: q12, ..
     }, Vector::UniformVectorSuperpos {
         q1: q21, q2: q22, ..
@@ -492,8 +494,7 @@ fn is_bell_basis(vecs: &[Vector]) -> bool {
             && q42_is_01
     } else {
         false
-    };
-    answer
+    }
 }
 
 /// Converts a Basis AST node into a qwerty::BasisAttribute and a separate list
