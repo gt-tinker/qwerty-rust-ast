@@ -20,8 +20,8 @@ use melior::{
 use qwerty_ast::{
     ast::{
         self, angle_is_approx_zero, angles_are_approx_equal, Assign, Basis, BasisTranslation,
-        BitLiteral, Conditional, Discard, Expr, FunctionDef, Measure, Pipe, Program, QLit, RegKind,
-        Return, Stmt, Tensor, UnpackAssign, Variable, Vector, VectorAtomKind,
+        BitLiteral, Conditional, Discard, Expr, FunctionDef, Measure, Pipe, Predicated, Program,
+        QLit, RegKind, Return, Stmt, Tensor, UnpackAssign, Variable, Vector, VectorAtomKind,
     },
     dbg::DebugLoc,
     typecheck::{ComputeKind, TypeEnv},
@@ -1282,6 +1282,197 @@ fn ast_expr_to_mlir(
                     vec![ret]
                 },
             )];
+            (ty, compute_kind, lambda)
+        }
+
+        Expr::Predicated(
+            predicated @ Predicated {
+                then_func,
+                else_func,
+                pred,
+                dbg,
+            },
+        ) => {
+            let loc = dbg_to_loc(dbg.clone());
+
+            let (then_ty, then_compute_kind, then_vals) = ast_expr_to_mlir(then_func, ctx, block);
+            let (else_ty, else_compute_kind, else_vals) = ast_expr_to_mlir(else_func, ctx, block);
+            let pred_ty = pred
+                .typecheck()
+                .expect("Predicate basis to pass typechecking");
+            let (ty, compute_kind) = predicated
+                .calc_type(
+                    &(then_ty, then_compute_kind),
+                    &(else_ty, else_compute_kind),
+                    &pred_ty,
+                )
+                .expect("Predication to pass typechecking");
+
+            assert_eq!(then_vals.len(), 1);
+            assert_eq!(else_vals.len(), 1);
+            let then_func_val = then_vals[0];
+            let else_func_val = else_vals[0];
+
+            let dim = match pred_ty {
+                ast::Type::RegType {
+                    elem_ty: RegKind::Basis,
+                    dim,
+                } => dim,
+                _ => panic!("input basis should have basis type"),
+            };
+
+            let lambda_captures = &[then_func_val, else_func_val];
+            let lambda_in_out_tys =
+                &[qwerty::QBundleType::new(&MLIR_CTX, dim.try_into().unwrap()).into()];
+            let is_rev = true;
+            let lambda = vec![mlir_wrap_lambda(
+                lambda_captures,
+                lambda_in_out_tys,
+                lambda_in_out_tys,
+                is_rev,
+                loc,
+                block,
+                |lambda_block| {
+                    assert_eq!(lambda_block.argument_count(), 3);
+                    let then_func = lambda_block.argument(0).unwrap().into();
+                    let else_func = lambda_block.argument(1).unwrap().into();
+                    let qbundle_in = lambda_block.argument(2).unwrap().into();
+
+                    let MlirBasis {
+                        basis_attr: pred_basis_attr,
+                        phases: _,
+                        explicit_indices: pred_explicit_indices,
+                        pad_indices: pred_pad_indices,
+                        tgt_indices: pred_tgt_indices,
+                    } = ast_basis_to_mlir(pred);
+
+                    assert!(!pred_explicit_indices.is_empty());
+
+                    let unpacked: Vec<_> = lambda_block
+                        .append_operation(qwerty::qbunpack(qbundle_in, loc))
+                        .results()
+                        .map(OperationResult::into)
+                        .collect();
+                    let bypass_qubits: Vec<_> =
+                        pred_pad_indices.iter().map(|i| unpacked[*i]).collect();
+                    let shuffled_qubits: Vec<_> = pred_explicit_indices
+                        .iter()
+                        .map(|i| unpacked[*i])
+                        .chain(pred_tgt_indices.iter().map(|i| unpacked[*i]))
+                        .collect();
+
+                    let shuffled_qbundle: Value<'static, 'static> = lambda_block
+                        .append_operation(qwerty::qbpack(&shuffled_qubits, loc))
+                        .result(0)
+                        .unwrap()
+                        .into();
+
+                    let pred_then_func = lambda_block
+                        .append_operation(qwerty::func_pred(
+                            &MLIR_CTX,
+                            pred_basis_attr,
+                            then_func,
+                            loc,
+                        ))
+                        .result(0)
+                        .unwrap()
+                        .into();
+                    let then_calli = lambda_block
+                        .append_operation(qwerty::call_indirect(
+                            pred_then_func,
+                            &[shuffled_qbundle],
+                            loc,
+                        ))
+                        .result(0)
+                        .unwrap()
+                        .into();
+
+                    let adj_else_func = lambda_block
+                        .append_operation(qwerty::func_adj(else_func, loc))
+                        .result(0)
+                        .unwrap()
+                        .into();
+                    let pred_adj_else_func = lambda_block
+                        .append_operation(qwerty::func_pred(
+                            &MLIR_CTX,
+                            pred_basis_attr,
+                            adj_else_func,
+                            loc,
+                        ))
+                        .result(0)
+                        .unwrap()
+                        .into();
+                    let else_calli = lambda_block
+                        .append_operation(qwerty::call_indirect(
+                            pred_adj_else_func,
+                            &[then_calli],
+                            loc,
+                        ))
+                        .result(0)
+                        .unwrap()
+                        .into();
+
+                    let qbunpack_shuffled =
+                        lambda_block.append_operation(qwerty::qbunpack(else_calli, loc));
+                    let mut unpacked_shuffled_qubits =
+                        qbunpack_shuffled.results().map(OperationResult::into);
+
+                    let mut explicit_queue: Vec<_> = unpacked_shuffled_qubits
+                        .by_ref()
+                        .take(pred_explicit_indices.len())
+                        .zip(pred_explicit_indices.into_iter())
+                        .collect();
+                    let tgt_fwd_qubits: Vec<_> = unpacked_shuffled_qubits.collect();
+
+                    // Still need to call the unadjointed (forward) version of else
+                    let tgt_fwd_qbundle = lambda_block
+                        .append_operation(qwerty::qbpack(&tgt_fwd_qubits, loc))
+                        .result(0)
+                        .unwrap()
+                        .into();
+                    let fwd_qbundle_out = lambda_block
+                        .append_operation(qwerty::call_indirect(else_func, &[tgt_fwd_qbundle], loc))
+                        .result(0)
+                        .unwrap()
+                        .into();
+
+                    explicit_queue.reverse();
+                    let mut tgt_queue: Vec<_> = lambda_block
+                        .append_operation(qwerty::qbunpack(fwd_qbundle_out, loc))
+                        .results()
+                        .map(OperationResult::into)
+                        .zip(pred_tgt_indices.into_iter())
+                        .collect();
+                    tgt_queue.reverse();
+                    let mut bypass_queue: Vec<_> = bypass_qubits
+                        .into_iter()
+                        .zip(pred_pad_indices.into_iter())
+                        .collect();
+                    bypass_queue.reverse();
+
+                    let mut repack_ready = vec![];
+                    for i in 0..dim {
+                        if let Some((qubit, _j)) = explicit_queue.pop_if(|(_qubit, j)| i == *j) {
+                            repack_ready.push(qubit);
+                        } else if let Some((qubit, _j)) = tgt_queue.pop_if(|(_qubit, j)| i == *j) {
+                            repack_ready.push(qubit);
+                        } else if let Some((qubit, _j)) = bypass_queue.pop_if(|(_qubit, j)| i == *j)
+                        {
+                            repack_ready.push(qubit);
+                        } else {
+                            unreachable!("qubit was neither part of the explicit basis, a padding, nor a target");
+                        }
+                    }
+
+                    let qbundle_out = lambda_block
+                        .append_operation(qwerty::qbpack(&repack_ready, loc))
+                        .result(0)
+                        .unwrap()
+                        .into();
+                    vec![qbundle_out]
+                },
+            )];
+
             (ty, compute_kind, lambda)
         }
 
