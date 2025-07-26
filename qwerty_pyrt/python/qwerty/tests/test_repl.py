@@ -62,3 +62,31 @@ class ReplTests(unittest.TestCase):
         print_func.assert_has_calls([call("Type Error: The return statement "
                                           "can only be written inside a "
                                           "function. (at column 1)"), call()])
+
+    def test_input_one_qubit(self):
+        prompt_func = Mock(side_effect=["'1'", EOFError()])
+        print_func = Mock()
+        repl(prompt_func, print_func)
+        prompt_func.assert_has_calls([call(self.PROMPT), call(self.PROMPT)])
+        print_func.assert_has_calls([call("q[0]"), call()])
+
+    def test_input_one_qubit_sigint(self):
+        prompt_func = Mock(side_effect=["'1'", KeyboardInterrupt()])
+        print_func = Mock()
+        repl(prompt_func, print_func)
+        prompt_func.assert_has_calls([call(self.PROMPT), call(self.PROMPT)])
+        print_func.assert_has_calls([call("q[0]"), call()])
+
+    def test_input_one_qubit_whitespace(self):
+        prompt_func = Mock(side_effect=["    '1'     ", EOFError()])
+        print_func = Mock()
+        repl(prompt_func, print_func)
+        prompt_func.assert_has_calls([call(self.PROMPT), call(self.PROMPT)])
+        print_func.assert_has_calls([call("q[0]"), call()])
+
+    def test_input_empty_then_one_qubit(self):
+        prompt_func = Mock(side_effect=['    ', "'1'", EOFError()])
+        print_func = Mock()
+        repl(prompt_func, print_func)
+        prompt_func.assert_has_calls([call(self.PROMPT), call(self.PROMPT)])
+        print_func.assert_has_calls([call("q[0]"), call()])
