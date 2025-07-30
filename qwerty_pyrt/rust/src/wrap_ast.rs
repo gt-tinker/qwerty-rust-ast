@@ -496,6 +496,24 @@ impl Expr {
     }
 
     #[classmethod]
+    fn new_predicated(
+        _cls: &Bound<'_, PyType>,
+        then_func: Expr,
+        else_func: Expr,
+        pred: Basis,
+        dbg: Option<DebugLoc>,
+    ) -> Self {
+        Self {
+            expr: ast::Expr::Predicated(ast::Predicated {
+                then_func: Box::new(then_func.expr),
+                else_func: Box::new(else_func.expr),
+                pred: pred.basis,
+                dbg: dbg.map(|dbg| dbg.dbg),
+            }),
+        }
+    }
+
+    #[classmethod]
     fn new_conditional(
         _cls: &Bound<'_, PyType>,
         then_expr: Expr,

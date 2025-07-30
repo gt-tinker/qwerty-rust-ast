@@ -905,7 +905,10 @@ fn ast_expr_to_mlir(
             let (ty, compute_kind) = var
                 .calc_type(&mut ctx.type_env)
                 .expect("Variable to pass typechecking");
-            let bound_vals = ctx.bindings.get(name).expect("Variable to be bound");
+            let bound_vals = ctx
+                .bindings
+                .get(name)
+                .expect(&format!("Variable {} to be bound", name));
 
             let mlir_vals = match bound_vals {
                 BoundVals::Materialized(vals) => vals.clone(),
@@ -1702,11 +1705,29 @@ fn ast_func_def_to_mlir(
         .map(|(name, ast_ty, _mlir_ty)| (name.to_string(), ast_ty.clone()))
         .collect();
     let mut ctx = Ctx::new(&func_block, func_def.new_type_env(&func_tys_available));
+
+    // Bind function arguments
+    assert_eq!(func_def.args.len(), func_block.argument_count());
+    for (arg_name, arg_val) in func_def
+        .args
+        .iter()
+        .map(|(_ty, name)| name)
+        .zip(func_block.arguments())
+    {
+        let old_binding = ctx.bindings.insert(
+            arg_name.to_string(),
+            BoundVals::Materialized(vec![arg_val.into()]),
+        );
+        assert!(old_binding.is_none());
+    }
+
+    // Bind other function names
     for (avail_func_name, _avail_func_ast_ty, avail_func_ty) in funcs_available {
-        ctx.bindings.insert(
+        let old_binding = ctx.bindings.insert(
             avail_func_name.to_string(),
             BoundVals::UnmaterializedFunction(*avail_func_ty),
         );
+        assert!(old_binding.is_none());
     }
 
     for stmt in &func_def.body {
