@@ -128,3 +128,82 @@ impl Expr {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::angle_is_approx_zero;
+    use num_complex::Complex64;
+
+    fn assert_state_vectors_are_approx_equal(expected: &[Complex64], actual: &[Complex64]) {
+        assert_eq!(expected.len(), actual.len());
+        assert!(expected
+            .iter()
+            .zip(actual.iter())
+            .all(|(expected_amp, actual_amp)| angle_is_approx_zero(
+                (expected_amp - actual_amp).norm()
+            )));
+    }
+
+    // '0' -> value: q[0]
+    //        state vector: [1 0]
+    #[test]
+    fn test_eval_qlit_zero() {
+        let mut repl_state = ReplState::new();
+        let start_expr = Expr::QLit(QLit::ZeroQubit { dbg: None });
+
+        let actual_end_expr = start_expr.eval_to_value(&mut repl_state);
+        let expected_end_expr = Expr::QubitRef(QubitRef { index: 0 });
+        assert_eq!(expected_end_expr, actual_end_expr);
+
+        let actual_end_state = repl_state.sim.get_state_vector();
+        let expected_end_state = vec![Complex64::ONE, Complex64::ZERO];
+        assert_state_vectors_are_approx_equal(&expected_end_state, &actual_end_state);
+    }
+
+    // '1' -> value: q[0]
+    //        state vector: [0 1]
+    #[test]
+    fn test_eval_qlit_one() {
+        let mut repl_state = ReplState::new();
+        let start_expr = Expr::QLit(QLit::OneQubit { dbg: None });
+
+        let actual_end_expr = start_expr.eval_to_value(&mut repl_state);
+        let expected_end_expr = Expr::QubitRef(QubitRef { index: 0 });
+        assert_eq!(expected_end_expr, actual_end_expr);
+
+        let actual_end_state = repl_state.sim.get_state_vector();
+        let expected_end_state = vec![Complex64::ZERO, Complex64::ONE];
+        assert_state_vectors_are_approx_equal(&expected_end_state, &actual_end_state);
+    }
+
+    // '0'*'1' -> value: q[0]*q[1]
+    //            state vector: [0 0 1 0]
+    #[test]
+    fn test_eval_qlit_tensor_zero_one() {
+        let mut repl_state = ReplState::new();
+        let start_expr = Expr::QLit(QLit::QubitTensor {
+            qs: vec![QLit::ZeroQubit { dbg: None }, QLit::OneQubit { dbg: None }],
+            dbg: None,
+        });
+
+        let actual_end_expr = start_expr.eval_to_value(&mut repl_state);
+        let expected_end_expr = Expr::Tensor(Tensor {
+            vals: vec![
+                Expr::QubitRef(QubitRef { index: 0 }),
+                Expr::QubitRef(QubitRef { index: 1 }),
+            ],
+            dbg: None,
+        });
+        assert_eq!(expected_end_expr, actual_end_expr);
+
+        let actual_end_state = repl_state.sim.get_state_vector();
+        let expected_end_state = vec![
+            Complex64::ZERO,
+            Complex64::ZERO,
+            Complex64::ONE,
+            Complex64::ZERO,
+        ];
+        assert_state_vectors_are_approx_equal(&expected_end_state, &actual_end_state);
+    }
+}
