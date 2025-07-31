@@ -65,11 +65,12 @@ impl QLit {
                         _ => return None,
                     }
                 }
-                Some(Expr::Tensor(Tensor { vals, dbg: dbg.clone() }))
+                Some(Expr::Tensor(Tensor {
+                    vals,
+                    dbg: dbg.clone(),
+                }))
             }
-            QLit::QubitUnit { dbg } => {
-                Some(Expr::UnitLiteral(UnitLiteral { dbg: dbg.clone() }))
-            }
+            QLit::QubitUnit { dbg } => Some(Expr::UnitLiteral(UnitLiteral { dbg: dbg.clone() })),
         }
     }
 }
@@ -108,7 +109,7 @@ impl Expr {
     pub fn eval_step(&self, state: &mut ReplState) -> Option<Expr> {
         match self {
             Expr::QLit(qlit) => qlit.eval_step(state),
-            Expr::QubitRef(_) | Expr::UnitLiteral(_) => None,   
+            Expr::QubitRef(_) | Expr::UnitLiteral(_) => None,
             _ => todo!("eval_step()"),
         }
     }
