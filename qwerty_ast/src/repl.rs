@@ -54,9 +54,7 @@ impl QLit {
                     None // evaluation failed
                 }
             }
-            QLit::UniformSuperpos { q1, q2, .. } => {
-                todo!("UniformSuperpos"),
-            }
+            QLit::UniformSuperpos { .. } => todo!("UniformSuperpos"),
             // qs is a vector, so parse through vector and then evaluate
             QLit::QubitTensor { qs, dbg } => {
                 let mut vals = Vec::new();
