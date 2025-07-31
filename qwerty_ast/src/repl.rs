@@ -34,7 +34,7 @@ impl ReplState {
 }
 
 impl QLit {
-    pub fn eval_step_qubit(&self, state: &mut ReplState) -> Option<Expr> {
+    pub fn eval_step(&self, state: &mut ReplState) -> Option<Expr> {
         match self {
             QLit::ZeroQubit { .. } => {
                 let index = state.sim.allocate();
@@ -46,7 +46,7 @@ impl QLit {
                 Some(Expr::QubitRef(QubitRef { index }))
             }
             QLit::QubitTilt { q, angle_deg, .. } => {
-                let inside_expr = q.eval_step_qubit(state)?;
+                let inside_expr = q.eval_step(state)?;
                 if let Expr::QubitRef(QubitRef { index }) = inside_expr {
                     state.sim.rz(*angle_deg, index); // tilt using spacesim
                     Some(Expr::QubitRef(QubitRef { index }))
@@ -59,7 +59,7 @@ impl QLit {
             QLit::QubitTensor { qs, dbg } => {
                 let mut vals = Vec::new();
                 for qlit in qs {
-                    let inner_expr = qlit.eval_step_qubit(state)?;
+                    let inner_expr = qlit.eval_step(state)?;
                     match inner_expr {
                         Expr::QubitRef(_) => vals.push(inner_expr),
                         _ => return None,
@@ -107,7 +107,7 @@ impl Expr {
 
     pub fn eval_step(&self, state: &mut ReplState) -> Option<Expr> {
         match self {
-            Expr::QLit(qlit) => qlit.eval_step_qubit(state),
+            Expr::QLit(qlit) => qlit.eval_step(state),
             Expr::QubitRef(_) | Expr::UnitLiteral(_) => None,   
             _ => todo!("eval_step()"),
         }
