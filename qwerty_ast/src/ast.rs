@@ -1388,22 +1388,15 @@ pub enum BitRotateOp {
 
 // ----- Expressions (QPU) -----
 
-/// See [`QpuExpr::Variable`].
-#[derive(Debug, Clone, PartialEq)]
-pub struct QpuVariable {
-    pub name: String,
-    pub dbg: Option<DebugLoc>,
-}
-
 /// See [`QpuExpr::UnitLiteral`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct QpuUnitLiteral {
+pub struct UnitLiteral {
     pub dbg: Option<DebugLoc>,
 }
 
 /// See [`QpuExpr::EmbedClassical`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct QpuEmbedClassical {
+pub struct EmbedClassical {
     pub func: Box<BitExpr>,
     pub embed_kind: EmbedKind,
     pub dbg: Option<DebugLoc>,
@@ -1411,14 +1404,14 @@ pub struct QpuEmbedClassical {
 
 /// See [`QpuExpr::Adjoint`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct QpuAdjoint {
+pub struct Adjoint {
     pub func: Box<QpuExpr>,
     pub dbg: Option<DebugLoc>,
 }
 
 /// See [`QpuExpr::Pipe`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct QpuPipe {
+pub struct Pipe {
     pub lhs: Box<QpuExpr>,
     pub rhs: Box<QpuExpr>,
     pub dbg: Option<DebugLoc>,
@@ -1426,27 +1419,27 @@ pub struct QpuPipe {
 
 /// See [`QpuExpr::Measure`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct QpuMeasure {
+pub struct Measure {
     pub basis: Basis,
     pub dbg: Option<DebugLoc>,
 }
 
 /// See [`QpuExpr::Discard`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct QpuDiscard {
+pub struct Discard {
     pub dbg: Option<DebugLoc>,
 }
 
 /// See [`QpuExpr::Tensor`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct QpuTensor {
+pub struct Tensor {
     pub vals: Vec<QpuExpr>,
     pub dbg: Option<DebugLoc>,
 }
 
 /// See [`QpuExpr::BasisTranslation`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct QpuBasisTranslation {
+pub struct BasisTranslation {
     pub bin: Basis,
     pub bout: Basis,
     pub dbg: Option<DebugLoc>,
@@ -1454,7 +1447,7 @@ pub struct QpuBasisTranslation {
 
 /// See [`QpuExpr::Predicated`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct QpuPredicated {
+pub struct Predicated {
     pub then_func: Box<QpuExpr>,
     pub else_func: Box<QpuExpr>,
     pub pred: Basis,
@@ -1463,14 +1456,14 @@ pub struct QpuPredicated {
 
 /// See [`QpuExpr::NonUniformSuperpos`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct QpuNonUniformSuperpos {
+pub struct NonUniformSuperpos {
     pub pairs: Vec<(f64, QLit)>,
     pub dbg: Option<DebugLoc>,
 }
 
 /// See [`QpuExpr::Conditional`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct QpuConditional {
+pub struct Conditional {
     pub then_expr: Box<QpuExpr>,
     pub else_expr: Box<QpuExpr>,
     pub cond: Box<BitExpr>,
@@ -1497,55 +1490,55 @@ pub enum QpuExpr {
     /// ```text
     /// my_var
     /// ```
-    Variable(QpuVariable),
+    Variable(Variable),
 
     /// A unit literal. Represents an empty register or void. Example syntax:
     /// ```text
     /// []
     /// ```
-    UnitLiteral(QpuUnitLiteral),
+    UnitLiteral(UnitLiteral),
 
     /// Embeds a classical function into a quantum context. Example syntax:
     /// ```text
     /// embed_classical(my_bit_func, Sign)
     /// ```
-    EmbedClassical(QpuEmbedClassical),
+    EmbedClassical(EmbedClassical),
 
     /// Takes the adjoint of a function value. Example syntax:
     /// ```text
     /// ~f
     /// ```
-    Adjoint(QpuAdjoint),
+    Adjoint(Adjoint),
 
     /// Calls a function value. Example syntax for `f(x)`:
     /// ```text
     /// x | f
     /// ```
-    Pipe(QpuPipe),
+    Pipe(Pipe),
 
     /// A function value that measures its input when called. Example syntax:
     /// ```text
     /// measure
     /// ```
-    Measure(QpuMeasure),
+    Measure(Measure),
 
     /// A function value that discards its input when called. Example syntax:
     /// ```text
     /// discard
     /// ```
-    Discard(QpuDiscard),
+    Discard(Discard),
 
     /// A tensor product of function values or register values. Example syntax:
     /// ```text
     /// '0' * '1' * '0'
     /// ```
-    Tensor(QpuTensor),
+    Tensor(Tensor),
 
     /// The mighty basis translation. Example syntax:
     /// ```text
     /// {'0','1'} >> {'0',-'1'}
     /// ```
-    BasisTranslation(QpuBasisTranslation),
+    BasisTranslation(BasisTranslation),
 
     /// A function value that, when called, runs a function value (`then_func`)
     /// in a proper subspace and another function (`else_func`) in the orthogonal
@@ -1553,20 +1546,20 @@ pub enum QpuExpr {
     /// ```text
     /// flip if {'1_'} else id
     /// ```
-    Predicated(QpuPredicated),
+    Predicated(Predicated),
 
     /// A superposition of qubit literals that may not have uniform
     /// probabilities. Example syntax:
     /// ```text
     /// 0.25*'0' + 0.75*'1'
     /// ```
-    NonUniformSuperpos(QpuNonUniformSuperpos),
+    NonUniformSuperpos(NonUniformSuperpos),
 
     /// A classical conditional (ternary) expression. Example syntax:
     /// ```text
     /// flip if meas_result else id
     /// ```
-    Conditional(QpuConditional),
+    Conditional(Conditional),
 
     /// A qubit literal. Example syntax:
     /// ```text
@@ -1581,21 +1574,22 @@ pub enum QpuExpr {
     /// node printed.
     QubitRef(QubitRef),
 }
-
 impl fmt::Display for QpuExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            QpuExpr::Variable(v) => write!(f, "{}", v.name),
-            QpuExpr::UnitLiteral(_) => write!(f, "[]"),
-            QpuExpr::EmbedClassical(e) => {
-                write!(f, "embed_classical({}, {:?})", *e.func, e.embed_kind)
+            QpuExpr::Variable(Variable { name, .. }) => write!(f, "{}", name),
+            QpuExpr::UnitLiteral(UnitLiteral { .. }) => write!(f, "[]"),
+            QpuExpr::EmbedClassical(EmbedClassical {
+                func, embed_kind, ..
+            }) => {
+                write!(f, "embed_classical({}, {:?})", *func, embed_kind)
             }
-            QpuExpr::Adjoint(a) => write!(f, "~({})", *a.func),
-            QpuExpr::Pipe(p) => write!(f, "({}) | ({})", *p.lhs, *p.rhs),
-            QpuExpr::Measure(m) => write!(f, "({}).measure", m.basis),
-            QpuExpr::Discard(_) => write!(f, "discard"),
-            QpuExpr::Tensor(t) => {
-                for (i, val) in t.vals.iter().enumerate() {
+            QpuExpr::Adjoint(Adjoint { func, .. }) => write!(f, "~({})", *func),
+            QpuExpr::Pipe(Pipe { lhs, rhs, .. }) => write!(f, "({}) | ({})", *lhs, *rhs),
+            QpuExpr::Measure(Measure { basis, .. }) => write!(f, "({}).measure", basis),
+            QpuExpr::Discard(Discard { .. }) => write!(f, "discard"),
+            QpuExpr::Tensor(Tensor { vals, .. }) => {
+                for (i, val) in vals.iter().enumerate() {
                     if i > 0 {
                         write!(f, "*")?;
                     }
@@ -1603,16 +1597,17 @@ impl fmt::Display for QpuExpr {
                 }
                 Ok(())
             }
-            QpuExpr::BasisTranslation(b) => write!(f, "({}) >> ({})", b.bin, b.bout),
-            QpuExpr::Predicated(p) => {
-                write!(
-                    f,
-                    "({}) if ({}) else ({})",
-                    p.then_func, p.pred, p.else_func
-                )
+            QpuExpr::BasisTranslation(BasisTranslation { bin, bout, .. }) => {
+                write!(f, "({}) >> ({})", bin, bout)
             }
-            QpuExpr::NonUniformSuperpos(n) => {
-                for (i, (prob, qlit)) in n.pairs.iter().enumerate() {
+            QpuExpr::Predicated(Predicated {
+                then_func,
+                else_func,
+                pred,
+                ..
+            }) => write!(f, "({}) if ({}) else ({})", then_func, pred, else_func),
+            QpuExpr::NonUniformSuperpos(NonUniformSuperpos { pairs, .. }) => {
+                for (i, (prob, qlit)) in pairs.iter().enumerate() {
                     if i > 0 {
                         write!(f, " + ")?;
                     }
@@ -1620,15 +1615,14 @@ impl fmt::Display for QpuExpr {
                 }
                 Ok(())
             }
-            QpuExpr::Conditional(c) => {
-                write!(
-                    f,
-                    "({}) if ({}) else ({})",
-                    c.then_expr, c.cond, c.else_expr
-                )
-            }
+            QpuExpr::Conditional(Conditional {
+                then_expr,
+                else_expr,
+                cond,
+                ..
+            }) => write!(f, "({}) if ({}) else ({})", then_expr, cond, else_expr),
             QpuExpr::QLit(qlit) => write!(f, "{}", qlit),
-            QpuExpr::QubitRef(q_ref) => write!(f, "q[{}]", q_ref.index),
+            QpuExpr::QubitRef(QubitRef { index }) => write!(f, "q[{}]", index),
         }
     }
 }
@@ -1636,16 +1630,17 @@ impl fmt::Display for QpuExpr {
 // ----- Expressions (Classical) -----
 
 // Structs for BitExpr variants
-/// See [`BitExpr::Variable`].
+
+/// See [`QpuExpr::Variable`] and [`BitExpr::Variable`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct BitVariable {
+pub struct Variable {
     pub name: String,
     pub dbg: Option<DebugLoc>,
 }
 
 /// See [`BitExpr::Slice`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct BitSlice {
+pub struct Slice {
     pub val: Box<BitExpr>,
     pub lower: usize,
     pub upper: usize,
@@ -1721,8 +1716,8 @@ pub struct BitLiteralData {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BitExpr {
-    Variable(BitVariable),
-    Slice(BitSlice),
+    Variable(Variable),
+    Slice(Slice),
     BitUnaryNot(BitUnaryNot),
     BitBinaryOp(BitBinaryOpData),
     BitReduceOp(BitReduceOpData),
@@ -1736,38 +1731,46 @@ pub enum BitExpr {
 impl fmt::Display for BitExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BitExpr::Variable(v) => write!(f, "{}", v.name),
-            BitExpr::Slice(s) => write!(f, "{}[{}..{}]", *s.val, s.lower, s.upper),
-            BitExpr::BitUnaryNot(b) => write!(f, "!{}", *b.val),
-            BitExpr::BitBinaryOp(b) => {
-                let op_str = match b.op {
+            BitExpr::Variable(Variable { name, .. }) => write!(f, "{}", name),
+            BitExpr::Slice(Slice {
+                val, lower, upper, ..
+            }) => write!(f, "{}[{}..{}]", *val, lower, upper),
+            BitExpr::BitUnaryNot(BitUnaryNot { val, .. }) => write!(f, "!{}", *val),
+            BitExpr::BitBinaryOp(BitBinaryOpData {
+                op, left, right, ..
+            }) => {
+                let op_str = match op {
                     BitBinaryOp::And => "&",
                     BitBinaryOp::Or => "|",
                     BitBinaryOp::Xor => "^",
                 };
-                write!(f, "({}) {} ({})", *b.left, op_str, *b.right)
+                write!(f, "({}) {} ({})", *left, op_str, *right)
             }
-            BitExpr::BitReduceOp(b) => {
-                let op_str = match b.op {
+            BitExpr::BitReduceOp(BitReduceOpData { op, val, .. }) => {
+                let op_str = match op {
                     BitBinaryOp::And => "&",
                     BitBinaryOp::Or => "|",
                     BitBinaryOp::Xor => "^",
                 };
-                write!(f, "{}({})", op_str, *b.val)
+                write!(f, "{}({})", op_str, *val)
             }
-            BitExpr::BitRotateOp(b) => {
-                let op_str = match b.op {
+            BitExpr::BitRotateOp(BitRotateOpData { op, val, amt, .. }) => {
+                let op_str = match op {
                     BitRotateOp::Rotr => "rotr",
                     BitRotateOp::Rotl => "rotl",
                 };
-                write!(f, "{}({}, {})", op_str, *b.val, *b.amt)
+                write!(f, "{}({}, {})", op_str, *val, *amt)
             }
-            BitExpr::BitConcat(b) => write!(f, "({}) ++ ({})", *b.left, *b.right),
-            BitExpr::BitRepeat(b) => write!(f, "({}) * {}", *b.val, b.amt),
-            BitExpr::ModMul(m) => {
-                write!(f, "mod_mul({}, {}, {}, {})", m.x, m.j, *m.y, m.mod_n)
+            BitExpr::BitConcat(BitConcat { left, right, .. }) => {
+                write!(f, "({}) ++ ({})", *left, *right)
             }
-            BitExpr::BitLiteral(b) => write!(f, "bit[{}](0b{:b})", b.n_bits, b.val),
+            BitExpr::BitRepeat(BitRepeat { val, amt, .. }) => write!(f, "({}) * {}", *val, amt),
+            BitExpr::ModMul(ModMul { x, j, y, mod_n, .. }) => {
+                write!(f, "mod_mul({}, {}, {}, {})", x, j, *y, mod_n)
+            }
+            BitExpr::BitLiteral(BitLiteralData { val, n_bits, .. }) => {
+                write!(f, "bit[{}](0b{:b})", n_bits, val)
+            }
         }
     }
 }
