@@ -1627,8 +1627,8 @@ impl fmt::Display for QpuExpr {
                     c.then_expr, c.cond, c.else_expr
                 )
             }
-            QpuExpr::QLit(qlit) => write!(f, "{}", qlit), // Corrected: QLit is a tuple variant
-            QpuExpr::QubitRef(q_ref) => write!(f, "q[{}]", q_ref.index), // Added QubitRef display
+            QpuExpr::QLit(qlit) => write!(f, "{}", qlit),
+            QpuExpr::QubitRef(q_ref) => write!(f, "q[{}]", q_ref.index),
         }
     }
 }
@@ -1636,12 +1636,14 @@ impl fmt::Display for QpuExpr {
 // ----- Expressions (Classical) -----
 
 // Structs for BitExpr variants
+/// See [`BitExpr::Variable`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct BitVariable {
     pub name: String,
     pub dbg: Option<DebugLoc>,
 }
 
+/// See [`BitExpr::Slice`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct BitSlice {
     pub val: Box<BitExpr>,
@@ -1650,12 +1652,14 @@ pub struct BitSlice {
     pub dbg: Option<DebugLoc>,
 }
 
+/// See [`BitExpr::BitUnaryNot`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct BitUnaryNot {
     pub val: Box<BitExpr>,
     pub dbg: Option<DebugLoc>,
 }
 
+/// See [`BitExpr::BitBinaryOp`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct BitBinaryOpData {
     pub op: BitBinaryOp,
@@ -1664,6 +1668,7 @@ pub struct BitBinaryOpData {
     pub dbg: Option<DebugLoc>,
 }
 
+/// See [`BitExpr::BitReduceOp`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct BitReduceOpData {
     pub op: BitBinaryOp,
@@ -1671,6 +1676,7 @@ pub struct BitReduceOpData {
     pub dbg: Option<DebugLoc>,
 }
 
+/// See [`BitExpr::BitRotateOp`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct BitRotateOpData {
     pub op: BitRotateOp,
@@ -1679,6 +1685,7 @@ pub struct BitRotateOpData {
     pub dbg: Option<DebugLoc>,
 }
 
+/// See [`BitExpr::BitConcat`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct BitConcat {
     pub left: Box<BitExpr>,
@@ -1686,6 +1693,7 @@ pub struct BitConcat {
     pub dbg: Option<DebugLoc>,
 }
 
+/// See [`BitExpr::BitRepeat`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct BitRepeat {
     pub val: Box<BitExpr>,
@@ -1693,6 +1701,7 @@ pub struct BitRepeat {
     pub dbg: Option<DebugLoc>,
 }
 
+/// See [`BitExpr::ModMul`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModMul {
     pub x: usize,
@@ -1702,6 +1711,7 @@ pub struct ModMul {
     pub dbg: Option<DebugLoc>,
 }
 
+/// See [`BitExpr::BitLiteral`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct BitLiteralData {
     pub val: UBig,
