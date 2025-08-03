@@ -1656,7 +1656,7 @@ pub struct BitUnaryNot {
 
 /// See [`BitExpr::BitBinaryOp`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct BitBinaryOpData {
+pub struct BitBinaryOpExpr {
     pub op: BitBinaryOp,
     pub left: Box<BitExpr>,
     pub right: Box<BitExpr>,
@@ -1665,7 +1665,7 @@ pub struct BitBinaryOpData {
 
 /// See [`BitExpr::BitReduceOp`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct BitReduceOpData {
+pub struct BitReduceOpExpr {
     pub op: BitBinaryOp,
     pub val: Box<BitExpr>,
     pub dbg: Option<DebugLoc>,
@@ -1673,7 +1673,7 @@ pub struct BitReduceOpData {
 
 /// See [`BitExpr::BitRotateOp`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct BitRotateOpData {
+pub struct BitRotateOpExpr {
     pub op: BitRotateOp,
     pub val: Box<BitExpr>,
     pub amt: Box<BitExpr>,
@@ -1708,7 +1708,7 @@ pub struct ModMul {
 
 /// See [`BitExpr::BitLiteral`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct BitLiteralData {
+pub struct BitLiteral {
     pub val: UBig,
     pub n_bits: usize,
     pub dbg: Option<DebugLoc>,
@@ -1719,13 +1719,13 @@ pub enum BitExpr {
     Variable(Variable),
     Slice(Slice),
     BitUnaryNot(BitUnaryNot),
-    BitBinaryOp(BitBinaryOpData),
-    BitReduceOp(BitReduceOpData),
-    BitRotateOp(BitRotateOpData),
+    BitBinaryOp(BitBinaryOpExpr),
+    BitReduceOp(BitReduceOpExpr),
+    BitRotateOp(BitRotateOpExpr),
     BitConcat(BitConcat),
     BitRepeat(BitRepeat),
     ModMul(ModMul),
-    BitLiteral(BitLiteralData),
+    BitLiteral(BitLiteral),
 }
 
 impl fmt::Display for BitExpr {
@@ -1736,7 +1736,7 @@ impl fmt::Display for BitExpr {
                 val, lower, upper, ..
             }) => write!(f, "{}[{}..{}]", *val, lower, upper),
             BitExpr::BitUnaryNot(BitUnaryNot { val, .. }) => write!(f, "!{}", *val),
-            BitExpr::BitBinaryOp(BitBinaryOpData {
+            BitExpr::BitBinaryOp(BitBinaryOpExpr {
                 op, left, right, ..
             }) => {
                 let op_str = match op {
@@ -1746,7 +1746,7 @@ impl fmt::Display for BitExpr {
                 };
                 write!(f, "({}) {} ({})", *left, op_str, *right)
             }
-            BitExpr::BitReduceOp(BitReduceOpData { op, val, .. }) => {
+            BitExpr::BitReduceOp(BitReduceOpExpr { op, val, .. }) => {
                 let op_str = match op {
                     BitBinaryOp::And => "&",
                     BitBinaryOp::Or => "|",
@@ -1754,7 +1754,7 @@ impl fmt::Display for BitExpr {
                 };
                 write!(f, "{}({})", op_str, *val)
             }
-            BitExpr::BitRotateOp(BitRotateOpData { op, val, amt, .. }) => {
+            BitExpr::BitRotateOp(BitRotateOpExpr { op, val, amt, .. }) => {
                 let op_str = match op {
                     BitRotateOp::Rotr => "rotr",
                     BitRotateOp::Rotl => "rotl",
@@ -1768,7 +1768,7 @@ impl fmt::Display for BitExpr {
             BitExpr::ModMul(ModMul { x, j, y, mod_n, .. }) => {
                 write!(f, "mod_mul({}, {}, {}, {})", x, j, *y, mod_n)
             }
-            BitExpr::BitLiteral(BitLiteralData { val, n_bits, .. }) => {
+            BitExpr::BitLiteral(BitLiteral { val, n_bits, .. }) => {
                 write!(f, "bit[{}](0b{:b})", n_bits, val)
             }
         }
