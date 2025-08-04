@@ -1787,7 +1787,7 @@ pub struct StmtExpr<E> {
 
 /// See [`Stmt::Assign`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct StmtAssign<E> {
+pub struct Assign<E> {
     pub lhs: String,
     pub rhs: E,
     pub dbg: Option<DebugLoc>,
@@ -1795,7 +1795,7 @@ pub struct StmtAssign<E> {
 
 /// See [`Stmt::UnpackAssign`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct StmtUnpackAssign<E> {
+pub struct UnpackAssign<E> {
     pub lhs: Vec<String>,
     pub rhs: E,
     pub dbg: Option<DebugLoc>,
@@ -1803,7 +1803,7 @@ pub struct StmtUnpackAssign<E> {
 
 /// See [`Stmt::Return`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct StmtReturn<E> {
+pub struct Return<E> {
     pub val: E,
     pub dbg: Option<DebugLoc>,
 }
@@ -1820,27 +1820,27 @@ pub enum Stmt<E> {
     /// ```text
     /// q = '0'
     /// ```
-    Assign(StmtAssign<E>),
+    Assign(Assign<E>),
 
     /// A register-unpacking assignment statement. Example syntax:
     /// ```text
     /// q1, q2 = '01'
     /// ```
-    UnpackAssign(StmtUnpackAssign<E>),
+    UnpackAssign(UnpackAssign<E>),
 
     /// A return statement. Example syntax:
     /// ```text
     /// return q
     /// ```
-    Return(StmtReturn<E>),
+    Return(Return<E>),
 }
 
 impl<E: fmt::Display> fmt::Display for Stmt<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Stmt::Expr(StmtExpr { expr, .. }) => write!(f, "{}", expr),
-            Stmt::Assign(StmtAssign { lhs, rhs, .. }) => write!(f, "{} = {}", lhs, rhs),
-            Stmt::UnpackAssign(StmtUnpackAssign { lhs, rhs, .. }) => {
+            Stmt::Assign(Assign { lhs, rhs, .. }) => write!(f, "{} = {}", lhs, rhs),
+            Stmt::UnpackAssign(UnpackAssign { lhs, rhs, .. }) => {
                 for (i, name) in lhs.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
@@ -1849,7 +1849,7 @@ impl<E: fmt::Display> fmt::Display for Stmt<E> {
                 }
                 write!(f, " = {}", rhs)
             }
-            Stmt::Return(StmtReturn { val, .. }) => write!(f, "return {}", val),
+            Stmt::Return(Return { val, .. }) => write!(f, "return {}", val),
         }
     }
 }
