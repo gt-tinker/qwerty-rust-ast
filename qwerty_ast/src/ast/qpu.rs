@@ -17,7 +17,7 @@ pub struct UnitLiteral {
 /// See [`Expr::EmbedClassical`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct EmbedClassical {
-    pub func: Box<Expr>,
+    pub func_name: String,
     pub embed_kind: EmbedKind,
     pub dbg: Option<DebugLoc>,
 }
@@ -206,9 +206,16 @@ impl fmt::Display for Expr {
             Expr::Variable(var) => write!(f, "{}", var),
             Expr::UnitLiteral(UnitLiteral { .. }) => write!(f, "[]"),
             Expr::EmbedClassical(EmbedClassical {
-                func, embed_kind, ..
+                func_name,
+                embed_kind,
+                ..
             }) => {
-                write!(f, "embed_classical({}, {:?})", *func, embed_kind)
+                let embed_kind_str = match embed_kind {
+                    EmbedKind::Sign => "sign",
+                    EmbedKind::Xor => "xor",
+                    EmbedKind::InPlace => "inplace",
+                };
+                write!(f, "{}.{}", func_name, embed_kind_str)
             }
             Expr::Adjoint(Adjoint { func, .. }) => write!(f, "~({})", *func),
             Expr::Pipe(Pipe { lhs, rhs, .. }) => write!(f, "({}) | ({})", *lhs, *rhs),

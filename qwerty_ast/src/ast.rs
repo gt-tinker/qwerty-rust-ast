@@ -22,8 +22,6 @@ pub enum Type {
     RegType { elem_ty: RegKind, dim: usize },
     TupleType { tys: Vec<Type> },
     UnitType,
-    ClassicalFuncType { in_dim: usize, out_dim: usize },
-    ClassicalRevFuncType { in_out_dim: usize },
 }
 
 impl Type {
@@ -129,12 +127,6 @@ impl fmt::Display for Type {
                 write!(f, ")")
             }
             Type::UnitType => write!(f, "None"),
-            Type::ClassicalFuncType { in_dim, out_dim } => {
-                write!(f, "bfunc[{},{}]", in_dim, out_dim)
-            }
-            Type::ClassicalRevFuncType { in_out_dim } => {
-                write!(f, "rev_bfunc[{}]", in_out_dim)
-            }
         }
     }
 }
@@ -312,63 +304,14 @@ impl<E> FunctionDef<E> {
                 .expect("Function with multiple arguments must form a valid TupleType")
         };
 
-        // Determine if it's a classical function based on its return type
-        let is_classical_return = matches!(
-            self.ret_type,
-            Type::RegType {
-                elem_ty: RegKind::Bit,
-                ..
-            }
-        );
-
         if self.is_rev {
-            // Reversible functions can be quantum or classical
-            if is_classical_return {
-                if let Type::RegType { dim, .. } = self.ret_type {
-                    Type::ClassicalRevFuncType { in_out_dim: dim }
-                } else {
-                    // Fallback for non-bit reversible returns (e.g., Qubit)
-                    Type::RevFuncType {
-                        in_out_ty: Box::new(self.ret_type.clone()),
-                    }
-                }
-            } else {
-                // Quantum reversible function
-                Type::RevFuncType {
-                    in_out_ty: Box::new(self.ret_type.clone()),
-                }
+            Type::RevFuncType {
+                in_out_ty: Box::new(self.ret_type.clone()),
             }
         } else {
-            // Non-reversible functions can be quantum or classical
-            if is_classical_return {
-                if let Type::RegType { dim: out_dim, .. } = self.ret_type {
-                    // For classical functions, input type must also be a bit register
-                    if let Type::RegType {
-                        elem_ty: RegKind::Bit,
-                        dim: in_dim,
-                    } = in_ty
-                    {
-                        Type::ClassicalFuncType { in_dim, out_dim }
-                    } else {
-                        // Mixed or non-bit input, fallback to general FuncType
-                        Type::FuncType {
-                            in_ty: Box::new(in_ty),
-                            out_ty: Box::new(self.ret_type.clone()),
-                        }
-                    }
-                } else {
-                    // Non-bit return, fallback to general FuncType
-                    Type::FuncType {
-                        in_ty: Box::new(in_ty),
-                        out_ty: Box::new(self.ret_type.clone()),
-                    }
-                }
-            } else {
-                // Quantum or mixed non-reversible function
-                Type::FuncType {
-                    in_ty: Box::new(in_ty),
-                    out_ty: Box::new(self.ret_type.clone()),
-                }
+            Type::FuncType {
+                in_ty: Box::new(in_ty),
+                out_ty: Box::new(self.ret_type.clone()),
             }
         }
     }
