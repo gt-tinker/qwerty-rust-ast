@@ -1,3 +1,5 @@
+//! Expressions for `@classical` functions.
+
 use super::{BitLiteral, Variable};
 use crate::dbg::DebugLoc;
 use std::fmt;

@@ -1,4 +1,4 @@
-//! Expressions and bases for `@qpu` blocks.
+//! Expressions and bases for `@qpu` kernels.
 
 use super::{
     angle_approx_total_cmp, angle_is_approx_zero, angles_are_approx_equal, canon_angle,
