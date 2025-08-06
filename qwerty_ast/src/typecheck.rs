@@ -1,6 +1,5 @@
 //! Qwerty typechecker implementation: walks the AST and enforces all typing rules.
 
-use crate::ast::*;
 use crate::dbg::DebugLoc;
 use crate::error::{TypeError, TypeErrorKind};
 use dashu::base::BitTest;
@@ -8,13 +7,14 @@ use std::collections::{HashMap, HashSet};
 use std::iter::zip;
 
 use crate::ast::{
-    angles_are_approx_equal, anti_phase, in_phase,
+    angles_are_approx_equal, anti_phase, classical, in_phase, qpu,
     qpu::{
         Adjoint, Basis, BasisGenerator, BasisTranslation, Conditional, Discard, Expr, Measure,
         NonUniformSuperpos, Pipe, Predicated, QLit, QubitRef, Tensor, UnitLiteral, Vector,
         VectorAtomKind,
     },
-    Assign, BitLiteral, FunctionDef, Program, RegKind, Return, Stmt, UnpackAssign, Variable,
+    Assign, BitLiteral, Func, FunctionDef, Program, RegKind, Return, Stmt, StmtExpr, Type,
+    UnpackAssign, Variable,
 };
 
 /// Supplements the type judgment with an additional bit of information:
@@ -219,7 +219,7 @@ impl TypeCheckable for qpu::Expr {
         match self {
             qpu::Expr::Variable(var) => var.typecheck(env),
             qpu::Expr::UnitLiteral(unit_lit) => unit_lit.typecheck(),
-            qpu::Expr::EmbedClassical(embed_classical) => {
+            qpu::Expr::EmbedClassical(_) => {
                 todo!("EmbedClassical typechecking not implemented yet")
             }
             qpu::Expr::Adjoint(adj) => adj.typecheck(env),
@@ -244,15 +244,15 @@ impl TypeCheckable for classical::Expr {
     fn typecheck(&self, env: &mut TypeEnv) -> Result<(Type, ComputeKind), TypeError> {
         match self {
             classical::Expr::Variable(var) => var.typecheck(env),
-            classical::Expr::Slice(slice) => todo!(),
-            classical::Expr::UnaryOp(unary_op) => todo!(),
-            classical::Expr::BinaryOp(binary_op) => todo!(),
-            classical::Expr::ReduceOp(reduce_op) => todo!(),
-            classical::Expr::RotateOp(rotate_op) => todo!(),
-            classical::Expr::Concat(concat) => todo!(),
-            classical::Expr::Repeat(repeat) => todo!(),
-            classical::Expr::ModMul(mod_mul) => todo!(),
-            classical::Expr::BitLiteral(bit_lit) => todo!(),
+            classical::Expr::Slice(_) => todo!(),
+            classical::Expr::UnaryOp(_) => todo!(),
+            classical::Expr::BinaryOp(_) => todo!(),
+            classical::Expr::ReduceOp(_) => todo!(),
+            classical::Expr::RotateOp(_) => todo!(),
+            classical::Expr::Concat(_) => todo!(),
+            classical::Expr::Repeat(_) => todo!(),
+            classical::Expr::ModMul(_) => todo!(),
+            classical::Expr::BitLiteral(_) => todo!(),
         }
     }
 }
@@ -1262,7 +1262,7 @@ impl Expr {
             Expr::QLit(qlit) => qlit.typecheck(),
             Expr::BitLiteral(bit_lit) => bit_lit.typecheck(),
             Expr::QubitRef(qref) => qref.typecheck(),
-            Expr::EmbedClassical(embed_classical) => todo!(),
+            Expr::EmbedClassical(_) => todo!("typecheck EmbedClassical"),
         }
     }
 }
