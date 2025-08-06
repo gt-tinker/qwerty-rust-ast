@@ -41,7 +41,7 @@ impl Expr {
         match self {
             Expr::Variable(_) => false,
             Expr::UnitLiteral(_) => true,
-            Expr::EmbedClassical(EmbedClassical { func, .. }) => func.is_value(),
+            Expr::EmbedClassical(EmbedClassical { func_name: _, .. }) => true,
             Expr::Adjoint(Adjoint { func, .. }) => func.as_ref().is_value(),
             Expr::Pipe(_) => false,
             Expr::Measure(_) => true,
