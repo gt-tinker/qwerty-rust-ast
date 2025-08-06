@@ -699,7 +699,7 @@ impl Vector {
     }
 
     /// Simplifies the vector `left+right` by performing interference.
-    fn interfere(left: &Vector, right: &Vector) -> Option<Vector> {
+    pub fn interfere(left: &Vector, right: &Vector) -> Option<Vector> {
         match (left, right) {
             (
                 Vector::UniformVectorSuperpos {
