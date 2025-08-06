@@ -327,6 +327,24 @@ pub enum Func {
     Classical(FunctionDef<classical::Expr>),
 }
 
+impl Func {
+    /// Returns the name of this function.
+    pub fn get_name(&self) -> String {
+        match self {
+            Func::Qpu(func_def) => func_def.name.to_string(),
+            Func::Classical(func_def) => func_def.name.to_string(),
+        }
+    }
+
+    /// Constructs the type of this function.
+    pub fn get_type(&self) -> Type {
+        match self {
+            Func::Qpu(func_def) => func_def.get_type(),
+            Func::Classical(func_def) => func_def.get_type(),
+        }
+    }
+}
+
 /// The top-level node in a Qwerty program that holds all function defintiions.
 ///
 /// In the current implementation, there is only one of these per Python
